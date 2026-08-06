@@ -1,7 +1,7 @@
 // C108 巡回リスト オフライン用 Service Worker
 // 方針：初回に全ファイルをキャッシュし、以後はキャッシュを最優先で返す。
 // 会場で通信が不安定でも、キャッシュがあれば必ず起動する。
-const CACHE = 'c108-v1';
+const CACHE = 'c108-v2';
 const FILES = [
   './',
   './index.html',

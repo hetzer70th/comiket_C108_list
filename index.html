@@ -94,6 +94,10 @@ main{padding:10px 10px 96px}
 .row.s2{opacity:.42} .row.s2 .st{background:var(--gone);color:#ffd9e0}
 .row.s3{opacity:.32} .row.s3 .st{background:var(--skipc);color:var(--mute)}
 .empty{color:var(--dim);text-align:center;padding:40px 10px;font-size:14px}
+.badge{
+  display:inline-block;padding:2px 7px;border-radius:20px;font-size:10px;font-weight:800;
+  background:#2a3d29;color:#a8e6a1;border:1px solid #3d5a3b;margin-right:6px;flex-shrink:0;
+}
 
 /* ---- sheet ---- */
 .scrim{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:40;display:none}
@@ -155,7 +159,7 @@ pre{
   <div class="tabs">
     <div class="tab on" data-tab="Day1">Day1 <span style="font-weight:400;font-size:12px">8/15</span></div>
     <div class="tab" data-tab="Day2">Day2 <span style="font-weight:400;font-size:12px">8/16</span></div>
-    <div class="tab" data-tab="ADD">買った分</div>
+    <div class="tab" data-tab="ADD">追加</div>
   </div>
   <div id="ctl">
     <div class="bar">
@@ -210,8 +214,34 @@ function matches(r){
   const q = query.toLowerCase();
   return (r.p+' '+r.n).toLowerCase().includes(q);
 }
+function reindexAdded(removedIdx){
+  const shift = (obj) => {
+    const out = {};
+    for(const k in obj){
+      if(!k.startsWith('add-')){ out[k] = obj[k]; continue; }
+      const i = +k.split('-')[1];
+      if(i === removedIdx) continue;
+      out['add-' + (i > removedIdx ? i - 1 : i)] = obj[k];
+    }
+    return out;
+  };
+  db.status = shift(db.status);
+  db.memo = shift(db.memo);
+}
+function addedAsRows(){
+  return db.added.map((a,i) => ({
+    id: 'add-' + i,
+    p: a.p, n: a.n, d: a.d, h: a.h || '不明',
+    pr: a.pr || 'まあまあ', sell: '', memo: '', buy: '', url: '',
+    blk: (a.p.match(/^([^0-9]+)/)||['',''])[1].trim(),
+    num: parseInt((a.p.match(/(\d+)/)||['','0'])[1],10) || 0,
+    sfx: (a.p.match(/(\d+)([a-zA-Z]*)$/)||['','',''])[2] || '',
+    added: true,
+  }));
+}
+function allRows(){ return DATA.concat(addedAsRows()); }
 function rowsFor(day){
-  let rs = DATA.filter(r => r.d === day && matches(r));
+  let rs = allRows().filter(r => r.d === day && matches(r));
   if(sortMode === 'place'){
     rs.sort((a,b) => HALLS.indexOf(a.h)-HALLS.indexOf(b.h)
       || a.blk.localeCompare(b.blk,'ja') || a.num-b.num || a.sfx.localeCompare(b.sfx));
@@ -232,7 +262,7 @@ function render(){
   if(tab === 'ADD'){ main.innerHTML = addHTML(); bindAdd(); return; }
 
   const rs = rowsFor(tab);
-  const all = DATA.filter(r => r.d === tab);
+  const all = allRows().filter(r => r.d === tab);
   const z = all.filter(r => r.pr === '絶対');
   const zLeft = z.filter(r => (db.status[r.id]||0) === 0).length;
   const done = all.filter(r => (db.status[r.id]||0) !== 0).length;
@@ -258,7 +288,7 @@ function render(){
     html += `<div class="row p${Math.min(PR[r.pr],3)} s${s}" data-id="${esc(r.id)}">
       <div class="chip">${esc(r.p)}</div>
       <div class="body">
-        <div class="nm${r.n?'':' none'}">${esc(r.n||'（名称未取得）')}</div>
+        <div class="nm${r.n?'':' none'}">${r.added?'<span class="badge">追加</span>':''}${esc(r.n||'（名称未取得）')}</div>
         <div class="sub">${sub.join('')}</div>
       </div>
       <div class="st">${ST[s].slice(0,3)}</div>
@@ -272,36 +302,59 @@ function render(){
 /* ---------- sheet ---------- */
 let cur = null;
 function openSheet(id){
-  cur = DATA.find(r => r.id === id);
+  cur = allRows().find(r => r.id === id);
   if(!cur) return;
   const s = db.status[id]||0;
   const cls = ['b3','b1','b2','b3'];
+  const PRIS = ['絶対','できれば','まあまあ','未分類'];
   document.getElementById('sheet').innerHTML = `
     <div class="sh">
       <div class="chip">${esc(cur.p)}</div>
-      <div class="body"><div class="nm">${esc(cur.n||'（名称未取得）')}</div>
-      <div class="sub"><span>${esc(cur.h)}</span><span>${esc(cur.pr)}</span>
+      <div class="body"><div class="nm">${cur.added?'<span class="badge">追加</span>':''}${esc(cur.n||'（名称未取得）')}</div>
+      <div class="sub"><span>${esc(cur.h)}</span>${cur.added?'':`<span>${esc(cur.pr)}</span>`}
       ${cur.sell?`<span class="t ${timeClass(cur.sell)}">過去の完売 ～${esc(cur.sell)}</span>`:''}</div></div>
     </div>
-    <div class="grid">
+    ${cur.added ? `
+    <label class="f">優先度</label>
+    <div class="grid" style="margin-top:6px" id="priGrid">
+      ${PRIS.map(p=>`<button class="btn b3 ${p===cur.pr?'sel':''}" data-pri="${p}">${p}</button>`).join('')}
+    </div>` : ''}
+    <label class="f" style="margin-top:14px">状況</label>
+    <div class="grid" style="margin-top:6px">
       ${ST.map((t,i)=>`<button class="btn ${cls[i]} ${i===s?'sel':''}" data-s="${i}">${t}</button>`).join('')}
     </div>
     ${cur.url
       ? `<a class="lnk" href="${esc(cur.url)}" target="_blank" rel="noopener">Xで開く（要通信）</a>`
-      : `<div class="lnk off">Twitter URL なし</div>`}
+      : ''}
     <label class="f">メモ</label>
     <textarea id="mm" rows="2" placeholder="買ったもの、次回への申し送りなど">${esc(db.memo[cur.id]||'')}</textarea>
     ${cur.memo?`<div class="hint">Notion側メモ：${esc(cur.memo)}</div>`:''}
-    <button class="btn wide" id="close" style="margin-top:12px">閉じる</button>`;
+    ${cur.added ? `<button class="btn wide b2" id="delAdd" style="margin-top:12px">この追加行を削除</button>` : ''}
+    <button class="btn wide" id="close" style="margin-top:8px">閉じる</button>`;
 
   document.getElementById('sheet').querySelectorAll('[data-s]').forEach(b =>
     b.addEventListener('click', () => {
       db.status[cur.id] = +b.dataset.s; save(); closeSheet(); render();
     }));
+  const pg = document.getElementById('priGrid');
+  if(pg) pg.querySelectorAll('[data-pri]').forEach(b =>
+    b.addEventListener('click', () => {
+      const idx = +cur.id.split('-')[1];
+      db.added[idx].pr = b.dataset.pri; save(); openSheet(id);
+    }));
   document.getElementById('mm').addEventListener('input', e => {
     const v = e.target.value.trim();
     if(v) db.memo[cur.id] = v; else delete db.memo[cur.id];
     save();
+  });
+  const delBtn = document.getElementById('delAdd');
+  if(delBtn) delBtn.addEventListener('click', () => {
+    if(confirm('この追加行を削除しますか')){
+      const idx = +cur.id.split('-')[1];
+      db.added.splice(idx,1);
+      reindexAdded(idx);
+      save(); closeSheet(); render();
+    }
   });
   document.getElementById('close').addEventListener('click', closeSheet);
   document.getElementById('sheet').classList.add('on');
@@ -329,14 +382,14 @@ function addHTML(){
     <div class="card">
       <div class="sh" style="margin:0">
         <div class="chip">${esc(a.p)}</div>
-        <div class="body"><div class="nm${a.n?'':' none'}">${esc(a.n||'（名称なし）')}</div>
-        <div class="sub"><span class="pill">${esc(a.d)}</span><span class="pill">${esc(a.h||'ホール不明')}</span></div>
+        <div class="body"><div class="nm${a.n?'':' none'}"><span class="badge">追加</span>${esc(a.n||'（名称なし）')}</div>
+        <div class="sub"><span class="pill">${esc(a.d)}</span><span class="pill">${esc(a.h||'ホール不明')}</span><span class="pill">${esc(a.pr)}</span></div>
         ${a.m?`<div class="hint">${esc(a.m)}</div>`:''}</div>
-        <button class="mini" data-del="${i}">削除</button>
       </div>
     </div>`).join('');
   return `
     <div class="card">
+      <div class="hint">列待機中に見つけたサークルをここから追加すると、Day1/Day2の一覧にも表示されます。優先度・状況は追加後、一覧から普段どおり編集できます。</div>
       <label class="f">配置（必須）</label>
       <input id="ap" type="text" placeholder="例：ア07ab / A32ab / め45ab / a39a" autocomplete="off">
       <div class="hint" id="ah">ホールは配置から自動判定します</div>
@@ -347,22 +400,29 @@ function addHTML(){
         <button class="btn b3 sel" data-d="Day1">Day1</button>
         <button class="btn b3" data-d="Day2">Day2</button>
       </div>
+      <label class="f">優先度</label>
+      <div class="grid" style="margin-top:6px">
+        <button class="btn b3" data-pr="絶対">絶対</button>
+        <button class="btn b3 sel" data-pr="できれば">できれば</button>
+        <button class="btn b3" data-pr="まあまあ">まあまあ</button>
+        <button class="btn b3" data-pr="未分類">未分類</button>
+      </div>
       <label class="f">メモ（任意）</label>
-      <textarea id="am" rows="2" placeholder="買ったもの、名簿に入れるか等"></textarea>
-      <button class="add" id="addBtn" disabled>追加する</button>
+      <textarea id="am" rows="2" placeholder="委託内容、買ったものなど"></textarea>
+      <button class="add" id="addBtn" disabled>一覧に追加する</button>
     </div>
-    <div class="hall"><b>買った分</b><span>${db.added.length}件</span></div>
+    <div class="hall"><b>追加したサークル</b><span>${db.added.length}件</span></div>
     ${list || '<div class="empty">まだありません</div>'}
     <button class="btn wide" id="exp" style="margin-top:20px">Notionへ戻す用に書き出す</button>`;
 }
 function bindAdd(){
-  let day = 'Day1';
+  let day = 'Day1', pri = 'できれば';
   const ap = document.getElementById('ap'), btn = document.getElementById('addBtn');
   const upd = () => {
     const v = ap.value.trim();
     btn.disabled = !v;
     document.getElementById('ah').textContent =
-      v ? (hallOf(v) ? 'ホール：' + hallOf(v) : 'ホールを判定できません（後で補完してください）')
+      v ? (hallOf(v) ? 'ホール：' + hallOf(v) : 'ホールを判定できません（後で一覧から補完してください）')
         : 'ホールは配置から自動判定します';
   };
   ap.addEventListener('input', upd);
@@ -370,16 +430,17 @@ function bindAdd(){
     day = b.dataset.d;
     document.querySelectorAll('[data-d]').forEach(x => x.classList.toggle('sel', x === b));
   }));
+  document.querySelectorAll('[data-pr]').forEach(b => b.addEventListener('click', () => {
+    pri = b.dataset.pr;
+    document.querySelectorAll('[data-pr]').forEach(x => x.classList.toggle('sel', x === b));
+  }));
   btn.addEventListener('click', () => {
     const p = ap.value.trim();
     if(!p) return;
     db.added.push({p, n:document.getElementById('an').value.trim(),
-      m:document.getElementById('am').value.trim(), d:day, h:hallOf(p)});
+      m:document.getElementById('am').value.trim(), d:day, pr:pri, h:hallOf(p)});
     save(); render();
   });
-  document.querySelectorAll('[data-del]').forEach(b => b.addEventListener('click', () => {
-    if(confirm('この行を削除しますか')){ db.added.splice(+b.dataset.del,1); save(); render(); }
-  }));
   document.getElementById('exp').addEventListener('click', exportText);
 }
 
@@ -387,15 +448,17 @@ function bindAdd(){
 function exportText(){
   const chg = DATA.filter(r => (db.status[r.id]||0) !== 0 || db.memo[r.id]);
   let t = `C108 巡回結果　書き出し ${new Date().toLocaleString('ja-JP')}\n`;
-  t += `\n===== 1. 状況の変更（${chg.length}件）=====\n`;
+  t += `\n===== 1. 既存行の状況変更（${chg.length}件）=====\n`;
   t += chg.length ? chg.map(r =>
     `${r.d}\t${r.p}\t${r.n}\t${ST[db.status[r.id]||0]}${db.memo[r.id]?'\t'+db.memo[r.id]:''}`
   ).join('\n') : '（なし）';
-  t += `\n\n===== 2. 新規購入（${db.added.length}件）=====\n`;
-  t += db.added.length ? db.added.map(a =>
-    `${a.d}\t${a.p}\t${a.n}\t${a.h}\t108${a.m?'\t'+a.m:''}`
-  ).join('\n') : '（なし）';
-  t += `\n\n（列：日程／配置／サークル名／状況またはホール／…）\n`;
+  t += `\n\n===== 2. 新規追加サークル（${db.added.length}件）=====\n`;
+  t += db.added.length ? db.added.map((a,i) => {
+    const s = db.status['add-'+i]||0;
+    return `${a.d}\t${a.p}\t${a.n}\t${a.h}\t${a.pr}\t${ST[s]}\t108${a.m?'\t'+a.m:''}`;
+  }).join('\n') : '（なし）';
+  t += `\n\n（1の列：日程／配置／サークル名／状況／メモ）\n`;
+  t += `（2の列：日程／配置／サークル名／ホール／優先度／状況／開催回／メモ）\n`;
 
   const sh = document.getElementById('sheet');
   sh.innerHTML = `<div class="sh"><div class="body"><div class="nm">書き出し</div>
