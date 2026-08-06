@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="robots" content="noindex,nofollow,noarchive">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<meta name="theme-color" content="#0d1014">
+<title>C108 巡回リスト</title>
+<style>
+:root{
+  --bg:#0d1014; --panel:#161b22; --panel2:#1d242e; --line:#2b3440;
+  --ink:#e9edf3; --mute:#8b98ab; --dim:#5d6b7d;
+  --zettai:#ff3d68; --dekireba:#ffa724; --maamaa:#63798f; --etc:#4a5766;
+  --ok:#25c463; --gone:#7a4a55; --skipc:#3d4652;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0}
+body{
+  background:var(--bg);color:var(--ink);
+  font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Noto Sans JP",sans-serif;
+  font-size:15px;line-height:1.4;
+  padding-bottom:env(safe-area-inset-bottom);
+  -webkit-text-size-adjust:100%;
+}
+body.light{
+  --bg:#f2f4f7;--panel:#fff;--panel2:#e8ecf1;--line:#d3dae3;
+  --ink:#101720;--mute:#5b6878;--dim:#8b98ab;
+}
+
+/* ---- header ---- */
+header{
+  position:sticky;top:0;z-index:30;background:var(--bg);
+  padding:calc(env(safe-area-inset-top) + 8px) 10px 0;
+  border-bottom:1px solid var(--line);
+}
+.tabs{display:flex;gap:6px}
+.tab{
+  flex:1;padding:11px 4px;text-align:center;font-weight:700;font-size:15px;
+  background:var(--panel);color:var(--mute);border:1px solid var(--line);
+  border-bottom:none;border-radius:9px 9px 0 0;cursor:pointer;
+}
+.tab.on{background:var(--panel2);color:var(--ink)}
+.bar{display:flex;align-items:center;gap:8px;padding:8px 0}
+.count{font-size:13px;color:var(--mute);flex:1;font-variant-numeric:tabular-nums}
+.count b{color:var(--zettai);font-size:16px}
+.mini{
+  background:var(--panel);border:1px solid var(--line);color:var(--mute);
+  padding:7px 10px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;
+}
+.mini.on{color:var(--ink);border-color:var(--dim)}
+#q{
+  width:100%;padding:9px 11px;margin-bottom:8px;border-radius:8px;
+  background:var(--panel);border:1px solid var(--line);color:var(--ink);font-size:16px;
+}
+
+/* ---- list ---- */
+main{padding:10px 10px 96px}
+.hall{
+  display:flex;align-items:baseline;gap:8px;
+  margin:18px 0 8px;padding-bottom:5px;border-bottom:2px solid var(--line);
+}
+.hall b{font-size:17px;letter-spacing:.04em}
+.hall span{font-size:12px;color:var(--dim);font-variant-numeric:tabular-nums}
+.row{
+  display:flex;align-items:center;gap:10px;
+  padding:10px 10px;margin-bottom:6px;border-radius:10px;
+  background:var(--panel);border:1px solid var(--line);
+  border-left:5px solid var(--etc);cursor:pointer;
+}
+.row.p0{border-left-color:var(--zettai)}
+.row.p1{border-left-color:var(--dekireba)}
+.row.p2{border-left-color:var(--maamaa)}
+.chip{
+  min-width:74px;text-align:center;padding:7px 4px;border-radius:7px;
+  background:var(--panel2);border:1px solid var(--line);
+  font-weight:800;font-size:16px;letter-spacing:.02em;
+  font-variant-numeric:tabular-nums;white-space:nowrap;
+}
+.body{flex:1;min-width:0}
+.nm{font-weight:600;font-size:15px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.nm.none{color:var(--dim);font-weight:400}
+.sub{font-size:11.5px;color:var(--mute);margin-top:2px;display:flex;gap:8px;flex-wrap:wrap}
+.t{font-variant-numeric:tabular-nums;font-weight:700}
+.t.e{color:var(--zettai)} .t.m{color:var(--dekireba)} .t.l{color:var(--mute)}
+.st{
+  min-width:44px;text-align:center;font-size:11px;font-weight:800;
+  padding:6px 2px;border-radius:6px;background:var(--panel2);color:var(--dim);
+}
+.row.s1{opacity:.55} .row.s1 .st{background:var(--ok);color:#04220f}
+.row.s2{opacity:.42} .row.s2 .st{background:var(--gone);color:#ffd9e0}
+.row.s3{opacity:.32} .row.s3 .st{background:var(--skipc);color:var(--mute)}
+.empty{color:var(--dim);text-align:center;padding:40px 10px;font-size:14px}
+
+/* ---- sheet ---- */
+.scrim{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:40;display:none}
+.scrim.on{display:block}
+.sheet{
+  position:fixed;left:0;right:0;bottom:0;z-index:50;transform:translateY(102%);
+  transition:transform .18s ease-out;
+  background:var(--panel);border-top:1px solid var(--line);
+  border-radius:16px 16px 0 0;padding:14px 14px calc(env(safe-area-inset-bottom) + 16px);
+}
+.sheet.on{transform:none}
+@media (prefers-reduced-motion:reduce){.sheet{transition:none}}
+.sh{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+.sh .chip{font-size:19px;min-width:88px;padding:9px 6px}
+.sh .nm{font-size:17px;white-space:normal}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.btn{
+  padding:16px 6px;border-radius:10px;font-size:15px;font-weight:800;
+  background:var(--panel2);border:1px solid var(--line);color:var(--ink);
+  text-align:center;cursor:pointer;
+}
+.btn.sel{outline:2px solid var(--ink);outline-offset:-2px}
+.btn.b1{background:#123d24;border-color:#1d6b3c;color:#8ef0b4}
+.btn.b2{background:#3d1622;border-color:#6b2a3c;color:#ffb3c4}
+.btn.b3{background:var(--panel2);color:var(--mute)}
+.btn.wide{grid-column:1/-1}
+.lnk{
+  display:block;margin-top:8px;padding:14px;border-radius:10px;text-align:center;
+  background:var(--panel2);border:1px solid var(--line);
+  color:var(--ink);text-decoration:none;font-weight:700;font-size:14px;
+}
+.lnk.off{color:var(--dim);pointer-events:none}
+textarea,input[type=text]{
+  width:100%;margin-top:8px;padding:11px;border-radius:9px;font-size:16px;
+  background:var(--panel2);border:1px solid var(--line);color:var(--ink);
+  font-family:inherit;
+}
+label.f{display:block;font-size:12px;color:var(--mute);margin-top:12px;font-weight:600}
+.hint{font-size:12px;color:var(--dim);margin-top:6px}
+
+/* ---- add tab ---- */
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:12px}
+.add{width:100%;padding:15px;margin-top:14px;border-radius:10px;font-size:16px;font-weight:800;
+  background:var(--ok);color:#04220f;border:none;cursor:pointer}
+.add:disabled{background:var(--panel2);color:var(--dim)}
+.pill{display:inline-block;padding:3px 8px;border-radius:20px;background:var(--panel2);
+  font-size:11px;color:var(--mute);margin-right:5px}
+pre{
+  white-space:pre-wrap;word-break:break-all;background:var(--panel2);
+  border:1px solid var(--line);border-radius:9px;padding:11px;font-size:11.5px;
+  max-height:46vh;overflow:auto;color:var(--ink);
+}
+:focus-visible{outline:2px solid #6ea8ff;outline-offset:2px}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="tabs">
+    <div class="tab on" data-tab="Day1">Day1 <span style="font-weight:400;font-size:12px">8/15</span></div>
+    <div class="tab" data-tab="Day2">Day2 <span style="font-weight:400;font-size:12px">8/16</span></div>
+    <div class="tab" data-tab="ADD">買った分</div>
+  </div>
+  <div id="ctl">
+    <div class="bar">
+      <div class="count" id="count"></div>
+      <button class="mini" id="sortBtn">配置順</button>
+      <button class="mini" id="hideBtn">済を隠す</button>
+      <button class="mini" id="themeBtn">明</button>
+    </div>
+    <input id="q" type="text" placeholder="サークル名・配置で絞り込み" autocomplete="off">
+  </div>
+</header>
+
+<main id="main"></main>
+<div id="err" style="display:none;position:fixed;left:8px;right:8px;bottom:8px;z-index:99;
+  background:#3d1622;border:1px solid #6b2a3c;color:#ffb3c4;padding:10px 12px;
+  border-radius:10px;font-size:12px;word-break:break-all"></div>
+
+<div class="scrim" id="scrim"></div>
+<div class="sheet" id="sheet"></div>
+
+<script>
+const DATA = [{"id": "Day1|a16a", "p": "a16a", "n": "くろかり", "d": "Day1", "h": "南", "pr": "できれば", "sell": "", "memo": "", "buy": "要確認", "url": "", "blk": "a", "num": 16, "sfx": "a"}, {"id": "Day1|a18ab", "p": "a18ab", "n": "casino88", "d": "Day1", "h": "南", "pr": "できれば", "sell": "", "memo": "", "buy": "要確認", "url": "", "blk": "a", "num": 18, "sfx": "ab"}, {"id": "Day1|a25ab", "p": "a25ab", "n": "雪の降る煉瓦町", "d": "Day1", "h": "南", "pr": "できれば", "sell": "", "memo": "", "buy": "要確認", "url": "", "blk": "a", "num": 25, "sfx": "ab"}, {"id": "Day1|a28b", "p": "a28b", "n": "仁井家", "d": "Day1", "h": "南", "pr": "まあまあ", "sell": "", "memo": "", "buy": "", "url": "https://x.com/aleos696", "blk": "a", "num": 28, "sfx": "b"}, {"id": "Day1|a29ab", "p": "a29ab", "n": "勇者刑に処す本", "d": "Day1", "h": "南", "pr": "まあまあ", "sell": "", "memo": "", "buy": "", "url": "https://x.com/MEPHIST0216", "blk": "a", "num": 29, "sfx": "ab"}, {"id": "Day1|a39ab", "p": "a39ab", "n": "5年目の放課後", "d": "Day1", "h": "南", "pr": "まあまあ", "sell": "", "memo": "", "buy": "要確認", "url": "https://x.com/kantoku_5th", "blk": "a", "num": 39, "sfx": "ab"}, {"id": "Day1|ア02ab", "p": "ア02ab", "n": "よねや", "d": "Day1", "h": "東1-3", "pr": "できれば", "sell": "", "memo": "", "buy": "要確認", "url": "https://x.com/Aimiuni", "blk": "ア", "num": 2, "sfx": "ab"}, {"id": "Day1|ア03a", "p": "ア03a", "n": "しぐにゃん", "d": "Day1", "h": "東1-3", "pr": "まあまあ", "sell": "", "memo": "ブックマークから追加（2日目 ウ28ab あり）", "buy": "要確認", "url": "https://x.com/shiguneko", "blk": "ア", "num": 3, "sfx": "a"}, {"id": "Day1|ア05ab", "p": "ア05ab", "n": "RRR", "d": "Day1", "h": "東1-3", "pr": "できれば", "sell": "", "memo": "", "buy": "要確認", "url": "https://x.com/riosi_RRR", "blk": "ア", "num": 5, "sfx": "ab"}, {"id": "Day1|ア07ab", "p": "ア07ab", "n": "いもむすめ", "d": "Day1", "h": "東1-3", "pr": "絶対", "sell": "12:22", "memo": "", "buy": "要確認", "url": "https://x.com/ogipote", "blk": "ア", "num": 7, "sfx": "ab"}, {"id": "Day1|ア08ab", "p": "ア08ab", "n": "シミコ本 あやみ", "d": "Day1", "h": "東1-3", "pr": "まあまあ", "sell": "", "memo": "", "buy": "要確認", "url": "", "blk": "ア", "num": 8, "sfx": "ab"}, {"id": "Day1|ア13ab", "p": "ア13ab", "n": "無限大", "d": "Day1", "h": "東1-3", "pr": "絶対", "sell": "", "memo": "", "buy": "", "url": "", "blk": "ア", "num": 13, "sfx": "ab"}, {"id": "Day1|ア16ab", "p": "ア16ab", "n": "みらくるバーン", "d": "Day1", "h": "東1-3", "pr": "絶対", "sell": "12:02", "memo": "", "buy": "要確認", "url": "https://x.com/ramune_himiya", "blk": "ア", "num": 16, "sfx": "ab"}, {"id": "Day1|ア17ab", "p": "ア17ab", "n": "20NT", "d": "Day1", "h": "東1-3", "pr": "できれば", "sell": "", "memo": "", "buy": "要確認", "url": "https://x.com/fukemachi", "blk": "ア", "num": 17, "sfx": "ab"}, {"id": "Day1|ア21ab", "p": "ア21ab", "n": "えだまめ亭", "d": "Day1", "h": "東1-3", "pr": "絶対", "sell": "12:15", "memo": "", "buy": "要確認", "url": "https://x.com/uko_______3", "blk": "ア", "num": 21, "sfx": "ab"}, {"id": "Day1|ア73ab", "p": "ア73ab", "n": "まゆとかげ", "d": "Day1", "h": "東1-3", "pr": "絶対", "sell": "", "memo": "", "buy": "要確認", "url": "", "blk": "ア", "num": 73, "sfx": "ab"}, {"id": "Day1|エ13ab", "p": "エ13ab", "n": "森ノ夜", "d": "Day1", "h": "東1-3", "pr": "できれば", "sell": "", "memo": "", "buy": "要確認", "url": "https://x.com/lezon_re", "blk": "エ", "num": 13, "sfx": "ab"}, {"id": "Day1|ク53b", "p": "ク53b", "n": "White Lolita", "d": "Day1", "h": "東1-3", "pr": "できれば", "sell": "", "memo": "", "buy": "要確認", "url": "https://x.com/chatsune21", "blk": "ク", "num": 53, "sfx": "b"}, {"id": "Day1|ケ19ab", "p": "ケ19ab", "n": "Saturnalia", "d": "Day1", "h": "東1-3", "pr": "絶対", "sell": "13:56", "memo": "", "buy": "要確認", "url": "https://x.com/kyaroru0203", "blk": "ケ", "num": 19, "sfx": "ab"}, {"id": "Day1|コ16a", "p": "コ16a", "n": "キサキ本", "d": "Day1", "h": "東1-3", "pr": "できれば", "sell": "", "memo": "", "buy": "要確認", "url": "", "blk": "コ", "num": 16, "sfx": "a"}, {"id": "Day1|シ46ab", "p": "シ46ab", "n": "Attribute", "d": "Day1", "h": "東1-3", "pr": "できれば", "sell": "", "memo": "", "buy": "要確認", "url": "https://x.com/yuiattribute", "blk": "シ", "num": 46, "sfx": "ab"}, {"id": "Day1|ソ02a", "p": "ソ02a", "n": "だいなそ～ハウス", "d": "Day1", "h": "東1-3", "pr": "まあまあ", "sell": "", "memo": "", "buy": "要確認", "url": "https://x.com/noukatu", "blk": "ソ", "num": 2, "sfx": "a"}, {"id": "Day1|A02ab", "p": "A02ab", "n": "えてるな", "d": "Day1", "h": "東7", "pr": "まあまあ", "sell": "12:25", "memo": "作家名：りいちゅ（旧「りいちゅ」行を統合）", "buy": "", "url": "https://x.com/rityulate", "blk": "A", "num": 2, "sfx": "ab"}, {"id": "Day1|A05a", "p": "A05a", "n": "pokizm", "d": "Day1", "h": "東7", "pr": "絶対", "sell": "13:06", "memo": "", "buy": "要確認", "url": "https://x.com/POKImari02", "blk": "A", "num": 5, "sfx": "a"}, {"id": "Day1|A06ab", "p": "A06ab", "n": "sa-ya", "d": "Day1", "h": "東7", "pr": "まあまあ", "sell": "", "memo": "", "buy": "", "url": "", "blk": "A", "num": 6, "sfx": "ab"}, {"id": "Day1|A08ab", "p": "A08ab", "n": "essentia", "d": "Day1", "h": "東7", "pr": "できれば", "sell": "", "memo": "", "buy": "要確認", "url": "", "blk": "A", "num": 8, "sfx": "ab"}, {"id": "Day1|A11ab", "p": "A11ab", "n": "trick&treat", "d": "Day1", "h": "東7", "pr": "できれば", "sell": "", "memo": "", "buy": "要確認", "url": "", "blk": "A", "num": 11, "sfx": "ab"}, {"id": "Day1|A13ab", "p": "A13ab", "n": "えんどるふぃーん", "d": "Day1", "h": "東7", "pr": "できれば", "sell": "", "memo": "", "buy": "要確認", "url": "", "blk": "A", "num": 13, "sfx": "ab"}, {"id": "Day1|A17ab", "p": "A17ab", "n": "イコモチ", "d": "Day1", "h": "東7", "pr": "まあまあ", "sell": "", "memo": "", "buy": "", "url": "", "blk": "A", "num": 17, "sfx": "ab"}, {"id": "Day1|A18ab", "p": "A18ab", "n": "wireflame", "d": "Day1", "h": "東7", "pr": "まあまあ", "sell": "", "memo": "", "buy": "", "url": "", "blk": "A", "num": 18, "sfx": "ab"}, {"id": "Day1|A20ab", "p": "A20ab", "n": "天然水道水", "d": "Day1", "h": "東7", "pr": "できれば", "sell": "", "memo": "", "buy": "要確認", "url": "https://x.com/Parsley_F", "blk": "A", "num": 20, "sfx": "ab"}, {"id": "Day1|A21ab", "p": "A21ab", "n": "stella lucia", "d": "Day1", "h": "東7", "pr": "できれば", "sell": "13:44", "memo": "", "buy": "要確認", "url": "", "blk": "A", "num": 21, "sfx": "ab"}, {"id": "Day1|A22ab", "p": "A22ab", "n": "リンユウ", "d": "Day1", "h": "東7", "pr": "まあまあ", "sell": "", "memo": "", "buy": "", "url": "", "blk": "A", "num": 22, "sfx": "ab"}, {"id": "Day1|A23ab", "p": "A23ab", "n": "あかさあい", "d": "Day1", "h": "東7", "pr": "できれば", "sell": "", "memo": "", "buy": "要確認", "url": "https://x.com/AkasaAi2", "blk": "A", "num": 23, "sfx": "ab"}, {"id": "Day1|A24ab", "p": "A24ab", "n": "おわた社", "d": "Day1", "h": "東7", "pr": "まあまあ", "sell": "", "memo": "", "buy": "", "url": "https://x.com/wait_ar", "blk": "A", "num": 24, "sfx": "ab"}, {"id": "Day1|A26ab", "p": "A26ab", "n": "Floralia", "d": "Day1", "h": "東7", "pr": "まあまあ", "sell": "", "memo": "", "buy": "", "url": "https://x.com/gcmzi", "blk": "A", "num": 26, "sfx": "ab"}, {"id": "Day1|A32ab", "p": "A32ab", "n": "トマリ", "d": "Day1", "h": "東7", "pr": "できれば", "sell": "", "memo": "ブックマークから追加", "buy": "要確認", "url": "https://x.com/ttomarii", "blk": "A", "num": 32, "sfx": "ab"}, {"id": "Day1|A33ab", "p": "A33ab", "n": "tabgraphics", "d": "Day1", "h": "東7", "pr": "まあまあ", "sell": "14:11", "memo": "", "buy": "", "url": "https://x.com/kanzakihiro", "blk": "A", "num": 33, "sfx": "ab"}, {"id": "Day1|A34ab", "p": "A34ab", "n": "さしみねこ屋", "d": "Day1", "h": "東7", "pr": "できれば", "sell": "13:06", "memo": "", "buy": "要確認", "url": "https://x.com/momoco_haru", "blk": "A", "num": 34, "sfx": "ab"}, {"id": "Day1|A35ab", "p": "A35ab", "n": "大陸間弾道少女", "d": "Day1", "h": "東7", "pr": "できれば", "sell": "13:33", "memo": "", "buy": "要確認", "url": "https://x.com/AC______", "blk": "A", "num": 35, "sfx": "ab"}, {"id": "Day1|A37b", "p": "A37b", "n": "ASG", "d": "Day1", "h": "東7", "pr": "できれば", "sell": "", "memo": "", "buy": "要確認", "url": "", "blk": "A", "num": 37, "sfx": "b"}, {"id": "Day1|A38ab", "p": "A38ab", "n": "いちご園", "d": "Day1", "h": "東7", "pr": "絶対", "sell": "12:57", "memo": "", "buy": "要確認", "url": "https://x.com/plus15", "blk": "A", "num": 38, "sfx": "ab"}, {"id": "Day1|A44ab", "p": "A44ab", "n": "いちごさいず", "d": "Day1", "h": "東7", "pr": "まあまあ", "sell": "", "memo": "", "buy": "", "url": "https://x.com/erisize", "blk": "A", "num": 44, "sfx": "ab"}, {"id": "Day1|B19ab", "p": "B19ab", "n": "syrup rondo", "d": "Day1", "h": "東7", "pr": "まあまあ", "sell": "", "memo": "", "buy": "", "url": "https://x.com/nx_e78", "blk": "B", "num": 19, "sfx": "ab"}, {"id": "Day1|D18a", "p": "D18a", "n": "夏麦茶漬", "d": "Day1", "h": "東7", "pr": "まあまあ", "sell": "", "memo": "", "buy": "", "url": "https://x.com/absentable655", "blk": "D", "num": 18, "sfx": "a"}, {"id": "Day1|E24b", "p": "E24b", "n": "はるひな書店", "d": "Day1", "h": "東7", "pr": "まあまあ", "sell": "", "memo": "", "buy": "", "url": "https://x.com/haru_hololive", "blk": "E", "num": 24, "sfx": "b"}, {"id": "Day1|F11a", "p": "F11a", "n": "にゃろめのちゅーる", "d": "Day1", "h": "東7", "pr": "まあまあ", "sell": "", "memo": "", "buy": "", "url": "https://x.com/nyaromeART", "blk": "F", "num": 11, "sfx": "a"}, {"id": "Day1|F27b", "p": "F27b", "n": "ししろん本", "d": "Day1", "h": "東7", "pr": "まあまあ", "sell": "", "memo": "", "buy": "", "url": "https://x.com/0146_nattsun", "blk": "F", "num": 27, "sfx": "b"}, {"id": "Day1|F34ab", "p": "F34ab", "n": "さきまる", "d": "Day1", "h": "東7", "pr": "できれば", "sell": "", "memo": "ブックマークから追加", "buy": "要確認", "url": "https://x.com/sakimr1020", "blk": "F", "num": 34, "sfx": "ab"}, {"id": "Day1|H36ab", "p": "H36ab", "n": "ナナナアーツ", "d": "Day1", "h": "東7", "pr": "絶対", "sell": "", "memo": "", "buy": "要確認", "url": "https://x.com/nablack", "blk": "H", "num": 36, "sfx": "ab"}, {"id": "Day1|I03a", "p": "I03a", "n": "Into the Blue", "d": "Day1", "h": "東7", "pr": "まあまあ", "sell": "", "memo": "ブックマークから追加（作家：汐張神奈）", "buy": "要確認", "url": "https://x.com/shioharikanna", "blk": "I", "num": 3, "sfx": "a"}, {"id": "Day1|I09b", "p": "I09b", "n": "YUBISASHI KAKUNIN", "d": "Day1", "h": "東7", "pr": "できれば", "sell": "", "memo": "", "buy": "要確認", "url": "https://x.com/0w0miha0w0", "blk": "I", "num": 9, "sfx": "b"}, {"id": "Day1|I12ab", "p": "I12ab", "n": "しーぷきゃっと", "d": "Day1", "h": "東7", "pr": "できれば", "sell": "", "memo": "", "buy": "要確認", "url": "https://x.com/mizm_spn", "blk": "I", "num": 12, "sfx": "ab"}, {"id": "Day1|I13b", "p": "I13b", "n": "びびっどぼっくす", "d": "Day1", "h": "東7", "pr": "できれば", "sell": "", "memo": "", "buy": "要確認", "url": "https://x.com/vivivivi0808", "blk": "I", "num": 13, "sfx": "b"}, {"id": "Day1|I14a", "p": "I14a", "n": "COCOA BLUE", "d": "Day1", "h": "東7", "pr": "できれば", "sell": "", "memo": "", "buy": "要確認", "url": "https://x.com/cocoablue23", "blk": "I", "num": 14, "sfx": "a"}, {"id": "Day1|I18a", "p": "I18a", "n": "すとらんど", "d": "Day1", "h": "東7", "pr": "まあまあ", "sell": "", "memo": "", "buy": "", "url": "", "blk": "I", "num": 18, "sfx": "a"}, {"id": "Day1|I34a", "p": "I34a", "n": "異常彼岸戦線", "d": "Day1", "h": "東7", "pr": "まあまあ", "sell": "", "memo": "", "buy": "", "url": "https://x.com/yaruku", "blk": "I", "num": 34, "sfx": "a"}, {"id": "Day1|L12b", "p": "L12b", "n": "びたーちっぷ", "d": "Day1", "h": "東7", "pr": "まあまあ", "sell": "", "memo": "", "buy": "", "url": "https://x.com/koyubita", "blk": "L", "num": 12, "sfx": "b"}, {"id": "Day1|M03a", "p": "M03a", "n": "きよシコの夜", "d": "Day1", "h": "東7", "pr": "できれば", "sell": "", "memo": "", "buy": "要確認", "url": "https://x.com/kiyotan_0621", "blk": "M", "num": 3, "sfx": "a"}, {"id": "Day1|M47ab", "p": "M47ab", "n": "あんてぃーく。", "d": "Day1", "h": "東7", "pr": "できれば", "sell": "12:58", "memo": "", "buy": "要確認", "url": "https://x.com/mamy6o6", "blk": "M", "num": 47, "sfx": "ab"}, {"id": "Day1|O13ab", "p": "O13ab", "n": "icecocoa", "d": "Day1", "h": "東7", "pr": "まあまあ", "sell": "", "memo": "", "buy": "", "url": "https://x.com/nanasecocoa", "blk": "O", "num": 13, "sfx": "ab"}, {"id": "Day1|あ 36ab", "p": "あ 36ab", "n": "山猫BOX", "d": "Day1", "h": "西", "pr": "まあまあ", "sell": "", "memo": "", "buy": "", "url": "https://x.com/yamanekobox", "blk": "あ", "num": 36, "sfx": "ab"}, {"id": "Day1|ね23b", "p": "ね23b", "n": "ゆーりか", "d": "Day1", "h": "西", "pr": "まあまあ", "sell": "", "memo": "ブックマークから追加（2日目 ヤ50a 東3 あり）", "buy": "要確認", "url": "https://x.com/eureka_yu_rika", "blk": "ね", "num": 23, "sfx": "b"}, {"id": "Day1|ひ 36b", "p": "ひ 36b", "n": "貝殻の箱", "d": "Day1", "h": "西", "pr": "まあまあ", "sell": "", "memo": "", "buy": "", "url": "https://x.com/gn_yaky", "blk": "ひ", "num": 36, "sfx": "b"}, {"id": "Day1|ひ 41ab", "p": "ひ 41ab", "n": "NIGHT WEAR", "d": "Day1", "h": "西", "pr": "まあまあ", "sell": "", "memo": "", "buy": "", "url": "https://x.com/mo13tto", "blk": "ひ", "num": 41, "sfx": "ab"}, {"id": "Day1|ひ 46a", "p": "ひ 46a", "n": "SORATOKE", "d": "Day1", "h": "西", "pr": "まあまあ", "sell": "", "memo": "", "buy": "", "url": "https://x.com/srn_111", "blk": "ひ", "num": 46, "sfx": "a"}, {"id": "Day1|ほ27ab", "p": "ほ27ab", "n": "マルチーズランド", "d": "Day1", "h": "西", "pr": "まあまあ", "sell": "", "memo": "", "buy": "", "url": "https://x.com/gmpoo93", "blk": "ほ", "num": 27, "sfx": "ab"}, {"id": "Day1|め32ab", "p": "め32ab", "n": "ぷきゅのすけ", "d": "Day1", "h": "西", "pr": "できれば", "sell": "", "memo": "ブックマークから追加", "buy": "要確認", "url": "https://x.com/ringozaka_0913", "blk": "め", "num": 32, "sfx": "ab"}, {"id": "Day1|め33ab", "p": "め33ab", "n": "Blue apple", "d": "Day1", "h": "西", "pr": "できれば", "sell": "13:30", "memo": "", "buy": "要確認", "url": "https://x.com/marumoru_ka", "blk": "め", "num": 33, "sfx": "ab"}, {"id": "Day1|め35ab", "p": "め35ab", "n": "ETERNAL LAND", "d": "Day1", "h": "西", "pr": "まあまあ", "sell": "14:01", "memo": "", "buy": "", "url": "https://x.com/6U_s", "blk": "め", "num": 35, "sfx": "ab"}, {"id": "Day1|め44ab", "p": "め44ab", "n": "MILK BAR", "d": "Day1", "h": "西", "pr": "まあまあ", "sell": "", "memo": "", "buy": "", "url": "https://x.com/milky17s", "blk": "め", "num": 44, "sfx": "ab"}, {"id": "Day1|め45ab", "p": "め45ab", "n": "信虎会", "d": "Day1", "h": "西", "pr": "まあまあ", "sell": "", "memo": "", "buy": "", "url": "https://x.com/thesecond1372", "blk": "め", "num": 45, "sfx": "ab"}, {"id": "Day1|め69ab", "p": "め69ab", "n": "黒蛛白蛛", "d": "Day1", "h": "西", "pr": "できれば", "sell": "", "memo": "", "buy": "要確認", "url": "https://x.com/HongBsWs", "blk": "め", "num": 69, "sfx": "ab"}, {"id": "Day2|o12b", "p": "o12b", "n": "きせいせぞん", "d": "Day2", "h": "南", "pr": "まあまあ", "sell": "", "memo": "", "buy": "", "url": "", "blk": "o", "num": 12, "sfx": "b"}, {"id": "Day2|o21a", "p": "o21a", "n": "ごらんのすぽんさー", "d": "Day2", "h": "南", "pr": "まあまあ", "sell": "", "memo": "", "buy": "", "url": "", "blk": "o", "num": 21, "sfx": "a"}, {"id": "Day2|o31a", "p": "o31a", "n": "wildcat", "d": "Day2", "h": "南", "pr": "できれば", "sell": "", "memo": "", "buy": "要確認", "url": "", "blk": "o", "num": 31, "sfx": "a"}, {"id": "Day2|p05a", "p": "p05a", "n": "どんぶりめし", "d": "Day2", "h": "南", "pr": "まあまあ", "sell": "", "memo": "", "buy": "", "url": "", "blk": "p", "num": 5, "sfx": "a"}, {"id": "Day2|p17a", "p": "p17a", "n": "夜話.zip", "d": "Day2", "h": "南", "pr": "絶対", "sell": "", "memo": "", "buy": "要確認", "url": "", "blk": "p", "num": 17, "sfx": "a"}, {"id": "Day2|p23a", "p": "p23a", "n": "ogikubo100w", "d": "Day2", "h": "南", "pr": "できれば", "sell": "", "memo": "", "buy": "要確認", "url": "", "blk": "p", "num": 23, "sfx": "a"}, {"id": "Day2|r21b", "p": "r21b", "n": "東洋麺報舎", "d": "Day2", "h": "南", "pr": "まあまあ", "sell": "", "memo": "", "buy": "", "url": "", "blk": "r", "num": 21, "sfx": "b"}, {"id": "Day2|t07b", "p": "t07b", "n": "accademica", "d": "Day2", "h": "南", "pr": "まあまあ", "sell": "", "memo": "", "buy": "", "url": "", "blk": "t", "num": 7, "sfx": "b"}, {"id": "Day2|t44b", "p": "t44b", "n": "oオタ針灸", "d": "Day2", "h": "南", "pr": "まあまあ", "sell": "", "memo": "", "buy": "", "url": "", "blk": "t", "num": 44, "sfx": "b"}, {"id": "Day2|ア01ab", "p": "ア01ab", "n": "あんみつよもぎ亭", "d": "Day2", "h": "東1-3", "pr": "まあまあ", "sell": "", "memo": "", "buy": "", "url": "https://x.com/mitibmg20", "blk": "ア", "num": 1, "sfx": "ab"}, {"id": "Day2|ア07ab", "p": "ア07ab", "n": "orangemaru", "d": "Day2", "h": "東1-3", "pr": "できれば", "sell": "13:54", "memo": "", "buy": "要確認", "url": "https://x.com/OrangeMaru", "blk": "ア", "num": 7, "sfx": "ab"}, {"id": "Day2|ア13a", "p": "ア13a", "n": "ぽにドロップ", "d": "Day2", "h": "東1-3", "pr": "まあまあ", "sell": "", "memo": "ブックマークから追加（作家：ぽん）", "buy": "要確認", "url": "https://x.com/ponika_illust", "blk": "ア", "num": 13, "sfx": "a"}, {"id": "Day2|ア15ab", "p": "ア15ab", "n": "twinbox", "d": "Day2", "h": "東1-3", "pr": "できれば", "sell": "14:51", "memo": "", "buy": "要確認", "url": "https://x.com/twinbox_tb", "blk": "ア", "num": 15, "sfx": "ab"}, {"id": "Day2|ア17ab", "p": "ア17ab", "n": "三つ葉ちょこ", "d": "Day2", "h": "東1-3", "pr": "まあまあ", "sell": "", "memo": "ブックマークから追加", "buy": "要確認", "url": "https://x.com/osanpo_choco", "blk": "ア", "num": 17, "sfx": "ab"}, {"id": "Day2|ア18ab", "p": "ア18ab", "n": "うさぎ号", "d": "Day2", "h": "東1-3", "pr": "できれば", "sell": "13:13", "memo": "", "buy": "要確認", "url": "https://x.com/hoshi_u3", "blk": "ア", "num": 18, "sfx": "ab"}, {"id": "Day2|ア26b", "p": "ア26b", "n": "乱視と君と。", "d": "Day2", "h": "東1-3", "pr": "できれば", "sell": "", "memo": "", "buy": "要確認", "url": "https://x.com/kinsanta", "blk": "ア", "num": 26, "sfx": "b"}, {"id": "Day2|ア29ab", "p": "ア29ab", "n": "きのこのみ", "d": "Day2", "h": "東1-3", "pr": "できれば", "sell": "13:49", "memo": "", "buy": "要確認", "url": "https://x.com/konominoco", "blk": "ア", "num": 29, "sfx": "ab"}, {"id": "Day2|ア30ab", "p": "ア30ab", "n": "mignon works", "d": "Day2", "h": "東1-3", "pr": "絶対", "sell": "11:48", "memo": "作家名：mignon（名簿と同一と判断してサークル名をmignon→mignon worksに修正）", "buy": "要確認", "url": "https://x.com/mignon", "blk": "ア", "num": 30, "sfx": "ab"}, {"id": "Day2|ア31ab", "p": "ア31ab", "n": "きょくちょ局", "d": "Day2", "h": "東1-3", "pr": "できれば", "sell": "", "memo": "", "buy": "", "url": "", "blk": "ア", "num": 31, "sfx": "ab"}, {"id": "Day2|ア42ab", "p": "ア42ab", "n": "かみしき", "d": "Day2", "h": "東1-3", "pr": "できれば", "sell": "12:51", "memo": "", "buy": "要確認", "url": "https://x.com/Kamizuki_S1", "blk": "ア", "num": 42, "sfx": "ab"}, {"id": "Day2|ア46ab", "p": "ア46ab", "n": "甘噛本舗", "d": "Day2", "h": "東1-3", "pr": "まあまあ", "sell": "", "memo": "", "buy": "", "url": "", "blk": "ア", "num": 46, "sfx": "ab"}, {"id": "Day2|ア48ab", "p": "ア48ab", "n": "KAROMIX", "d": "Day2", "h": "東1-3", "pr": "まあまあ", "sell": "", "memo": "", "buy": "", "url": "https://x.com/karory", "blk": "ア", "num": 48, "sfx": "ab"}, {"id": "Day2|ア49ab", "p": "ア49ab", "n": "ぱんのみみ", "d": "Day2", "h": "東1-3", "pr": "できれば", "sell": "13:25", "memo": "", "buy": "要確認", "url": "", "blk": "ア", "num": 49, "sfx": "ab"}, {"id": "Day2|ア51a", "p": "ア51a", "n": "陸の孤島亭", "d": "Day2", "h": "東1-3", "pr": "できれば", "sell": "", "memo": "", "buy": "要確認", "url": "https://x.com/shayo510", "blk": "ア", "num": 51, "sfx": "a"}, {"id": "Day2|ア64ab", "p": "ア64ab", "n": "alicesyndrome", "d": "Day2", "h": "東1-3", "pr": "絶対", "sell": "13:18", "memo": "", "buy": "要確認", "url": "https://x.com/asagi_0398", "blk": "ア", "num": 64, "sfx": "ab"}, {"id": "Day2|ア66ab", "p": "ア66ab", "n": "王女の印", "d": "Day2", "h": "東1-3", "pr": "できれば", "sell": "", "memo": "", "buy": "要確認", "url": "https://x.com/111dormars", "blk": "ア", "num": 66, "sfx": "ab"}, {"id": "Day2|ア67ab", "p": "ア67ab", "n": "ぎゃろっぷだいな", "d": "Day2", "h": "東1-3", "pr": "まあまあ", "sell": "", "memo": "", "buy": "", "url": "https://x.com/rumi_narita", "blk": "ア", "num": 67, "sfx": "ab"}, {"id": "Day2|ア69ab", "p": "ア69ab", "n": "ちうころね", "d": "Day2", "h": "東1-3", "pr": "できれば", "sell": "", "memo": "", "buy": "要確認", "url": "https://x.com/yachippppp", "blk": "ア", "num": 69, "sfx": "ab"}, {"id": "Day2|ア79ab", "p": "ア79ab", "n": "藍月雨僘店", "d": "Day2", "h": "東1-3", "pr": "絶対", "sell": "", "memo": "", "buy": "要確認", "url": "", "blk": "ア", "num": 79, "sfx": "ab"}, {"id": "Day2|ア82ab", "p": "ア82ab", "n": "でんせつのうどん", "d": "Day2", "h": "東1-3", "pr": "できれば", "sell": "", "memo": "", "buy": "要確認", "url": "https://x.com/reikakrzk__", "blk": "ア", "num": 82, "sfx": "ab"}, {"id": "Day2|ウ21b", "p": "ウ21b", "n": "MILK BAR*", "d": "Day2", "h": "東1-3", "pr": "まあまあ", "sell": "", "memo": "", "buy": "", "url": "https://x.com/milky17s", "blk": "ウ", "num": 21, "sfx": "b"}, {"id": "Day2|ウ22ab", "p": "ウ22ab", "n": "スウガク屋さん", "d": "Day2", "h": "東1-3", "pr": "できれば", "sell": "", "memo": "", "buy": "要確認", "url": "", "blk": "ウ", "num": 22, "sfx": "ab"}, {"id": "Day2|ウ23ab", "p": "ウ23ab", "n": "khorosho", "d": "Day2", "h": "東1-3", "pr": "できれば", "sell": "14:16", "memo": "", "buy": "要確認", "url": "https://x.com/chihiro_15_", "blk": "ウ", "num": 23, "sfx": "ab"}, {"id": "Day2|ウ24ab", "p": "ウ24ab", "n": "PURPLECELL", "d": "Day2", "h": "東1-3", "pr": "絶対", "sell": "", "memo": "", "buy": "要確認", "url": "https://x.com/yunmi_0527", "blk": "ウ", "num": 24, "sfx": "ab"}, {"id": "Day2|ウ28ab", "p": "ウ28ab", "n": "しぐにゃん", "d": "Day2", "h": "東1-3", "pr": "まあまあ", "sell": "", "memo": "ブックマークから追加（1日目 ア03a あり）", "buy": "要確認", "url": "https://x.com/shiguneko", "blk": "ウ", "num": 28, "sfx": "ab"}, {"id": "Day2|エ42b", "p": "エ42b", "n": "林檎のなる木", "d": "Day2", "h": "東1-3", "pr": "まあまあ", "sell": "", "memo": "", "buy": "", "url": "", "blk": "エ", "num": 42, "sfx": "b"}, {"id": "Day2|カ07ab", "p": "カ07ab", "n": "玉子房", "d": "Day2", "h": "東1-3", "pr": "まあまあ", "sell": "", "memo": "", "buy": "", "url": "", "blk": "カ", "num": 7, "sfx": "ab"}, {"id": "Day2|カ48b", "p": "カ48b", "n": "めとろのーつ", "d": "Day2", "h": "東1-3", "pr": "まあまあ", "sell": "", "memo": "", "buy": "", "url": "", "blk": "カ", "num": 48, "sfx": "b"}, {"id": "Day2|キ40b", "p": "キ40b", "n": "純銀星", "d": "Day2", "h": "東1-3", "pr": "まあまあ", "sell": "", "memo": "", "buy": "", "url": "https://x.com/7thslv", "blk": "キ", "num": 40, "sfx": "b"}, {"id": "Day2|ク40ab", "p": "ク40ab", "n": "neocatcity", "d": "Day2", "h": "東1-3", "pr": "まあまあ", "sell": "", "memo": "", "buy": "", "url": "", "blk": "ク", "num": 40, "sfx": "ab"}, {"id": "Day2|ク53a", "p": "ク53a", "n": "層流少女", "d": "Day2", "h": "東1-3", "pr": "まあまあ", "sell": "", "memo": "", "buy": "", "url": "https://x.com/lezon_re", "blk": "ク", "num": 53, "sfx": "a"}, {"id": "Day2|ク61b", "p": "ク61b", "n": "バラ", "d": "Day2", "h": "東1-3", "pr": "できれば", "sell": "", "memo": "", "buy": "要確認", "url": "", "blk": "ク", "num": 61, "sfx": "b"}, {"id": "Day2|コ50a", "p": "コ50a", "n": "波乗りネイビー", "d": "Day2", "h": "東1-3", "pr": "まあまあ", "sell": "", "memo": "", "buy": "", "url": "", "blk": "コ", "num": 50, "sfx": "a"}, {"id": "Day2|サ41b", "p": "サ41b", "n": "時給178円", "d": "Day2", "h": "東1-3", "pr": "できれば", "sell": "", "memo": "", "buy": "要確認", "url": "", "blk": "サ", "num": 41, "sfx": "b"}, {"id": "Day2|ス25a", "p": "ス25a", "n": "よねや", "d": "Day2", "h": "東1-3", "pr": "まあまあ", "sell": "", "memo": "ブックマークから追加（1日目 ア02ab あり、作家：俵太）", "buy": "要確認", "url": "https://x.com/Aimiuni", "blk": "ス", "num": 25, "sfx": "a"}, {"id": "Day2|ス27ab", "p": "ス27ab", "n": "白金堂", "d": "Day2", "h": "東1-3", "pr": "できれば", "sell": "", "memo": "", "buy": "要確認", "url": "https://x.com/kirisamesui", "blk": "ス", "num": 27, "sfx": "ab"}, {"id": "Day2|ス29ab", "p": "ス29ab", "n": "Honey Road", "d": "Day2", "h": "東1-3", "pr": "できれば", "sell": "14:19", "memo": "", "buy": "要確認", "url": "https://x.com/_Beverb", "blk": "ス", "num": 29, "sfx": "ab"}, {"id": "Day2|ス35b", "p": "ス35b", "n": "475p", "d": "Day2", "h": "東1-3", "pr": "まあまあ", "sell": "", "memo": "", "buy": "", "url": "", "blk": "ス", "num": 35, "sfx": "b"}, {"id": "Day2|タ55a", "p": "タ55a", "n": "ウシノミヤ", "d": "Day2", "h": "東1-3", "pr": "できれば", "sell": "", "memo": "", "buy": "要確認", "url": "", "blk": "タ", "num": 55, "sfx": "a"}, {"id": "Day2|ツ03b", "p": "ツ03b", "n": "脳天ブロッコリー", "d": "Day2", "h": "東1-3", "pr": "まあまあ", "sell": "", "memo": "", "buy": "", "url": "", "blk": "ツ", "num": 3, "sfx": "b"}, {"id": "Day2|ネ43ab", "p": "ネ43ab", "n": "ctg通信", "d": "Day2", "h": "東1-3", "pr": "まあまあ", "sell": "", "memo": "", "buy": "", "url": "", "blk": "ネ", "num": 43, "sfx": "ab"}, {"id": "Day2|モ16b", "p": "モ16b", "n": "plant", "d": "Day2", "h": "東1-3", "pr": "まあまあ", "sell": "", "memo": "", "buy": "", "url": "", "blk": "モ", "num": 16, "sfx": "b"}, {"id": "Day2|モ54a", "p": "モ54a", "n": "genocidekiss", "d": "Day2", "h": "東1-3", "pr": "できれば", "sell": "", "memo": "", "buy": "要確認", "url": "", "blk": "モ", "num": 54, "sfx": "a"}, {"id": "Day2|ヤ41a", "p": "ヤ41a", "n": "イノトーン", "d": "Day2", "h": "東1-3", "pr": "できれば", "sell": "", "memo": "", "buy": "要確認", "url": "https://x.com/inoino1008", "blk": "ヤ", "num": 41, "sfx": "a"}, {"id": "Day2|ヤ49a", "p": "ヤ49a", "n": "pisu-house", "d": "Day2", "h": "東1-3", "pr": "まあまあ", "sell": "", "memo": "", "buy": "", "url": "", "blk": "ヤ", "num": 49, "sfx": "a"}, {"id": "Day2|ヤ50a", "p": "ヤ50a", "n": "summerrliy", "d": "Day2", "h": "東1-3", "pr": "できれば", "sell": "", "memo": "", "buy": "要確認", "url": "https://x.com/eureka_yu_rika", "blk": "ヤ", "num": 50, "sfx": "a"}, {"id": "Day2|ヤ52a", "p": "ヤ52a", "n": "にゃわらか", "d": "Day2", "h": "東1-3", "pr": "できれば", "sell": "", "memo": "", "buy": "要確認", "url": "", "blk": "ヤ", "num": 52, "sfx": "a"}, {"id": "Day2|ユ30b", "p": "ユ30b", "n": "ゆずしゅわ本舗", "d": "Day2", "h": "東1-3", "pr": "できれば", "sell": "", "memo": "", "buy": "要確認", "url": "", "blk": "ユ", "num": 30, "sfx": "b"}, {"id": "Day2|ユ49a", "p": "ユ49a", "n": "萌送社", "d": "Day2", "h": "東1-3", "pr": "できれば", "sell": "", "memo": "", "buy": "要確認", "url": "", "blk": "ユ", "num": 49, "sfx": "a"}, {"id": "Day2|ヨ08a", "p": "ヨ08a", "n": "しーぷきゃっと", "d": "Day2", "h": "東1-3", "pr": "まあまあ", "sell": "", "memo": "", "buy": "", "url": "https://x.com/mizm_spn", "blk": "ヨ", "num": 8, "sfx": "a"}, {"id": "Day2|ヨ14b", "p": "ヨ14b", "n": "natonoia", "d": "Day2", "h": "東1-3", "pr": "まあまあ", "sell": "", "memo": "", "buy": "", "url": "", "blk": "ヨ", "num": 14, "sfx": "b"}, {"id": "Day2|ヨ25a", "p": "ヨ25a", "n": "毒電波通信", "d": "Day2", "h": "東1-3", "pr": "できれば", "sell": "", "memo": "", "buy": "要確認", "url": "", "blk": "ヨ", "num": 25, "sfx": "a"}, {"id": "Day2|ヨ27b", "p": "ヨ27b", "n": "StraiL", "d": "Day2", "h": "東1-3", "pr": "できれば", "sell": "", "memo": "", "buy": "要確認", "url": "https://x.com/saka600", "blk": "ヨ", "num": 27, "sfx": "b"}, {"id": "Day2|ヨ30a", "p": "ヨ30a", "n": "庵組", "d": "Day2", "h": "東1-3", "pr": "できれば", "sell": "", "memo": "", "buy": "要確認", "url": "", "blk": "ヨ", "num": 30, "sfx": "a"}, {"id": "Day2|ヨ38a", "p": "ヨ38a", "n": "DogStyle", "d": "Day2", "h": "東1-3", "pr": "まあまあ", "sell": "", "memo": "", "buy": "", "url": "https://x.com/meneathedog", "blk": "ヨ", "num": 38, "sfx": "a"}, {"id": "Day2|ヨ43ab", "p": "ヨ43ab", "n": "Lift upstairs", "d": "Day2", "h": "東1-3", "pr": "できれば", "sell": "", "memo": "", "buy": "要確認", "url": "https://x.com/quarterlift", "blk": "ヨ", "num": 43, "sfx": "ab"}, {"id": "Day2|ヨ44b", "p": "ヨ44b", "n": "山猫BOX＋", "d": "Day2", "h": "東1-3", "pr": "まあまあ", "sell": "", "memo": "", "buy": "", "url": "https://x.com/yamanekobox", "blk": "ヨ", "num": 44, "sfx": "b"}, {"id": "Day2|ヨ49a", "p": "ヨ49a", "n": "i2forme", "d": "Day2", "h": "東1-3", "pr": "まあまあ", "sell": "", "memo": "", "buy": "", "url": "https://x.com/i2forme", "blk": "ヨ", "num": 49, "sfx": "a"}, {"id": "Day2|ヨ 53a", "p": "ヨ 53a", "n": "stoned", "d": "Day2", "h": "東1-3", "pr": "できれば", "sell": "", "memo": "", "buy": "要確認", "url": "", "blk": "ヨ", "num": 53, "sfx": "a"}, {"id": "Day2|A01ab", "p": "A01ab", "n": "Horizontal World", "d": "Day2", "h": "東7", "pr": "絶対", "sell": "12:23", "memo": "", "buy": "要確認", "url": "https://x.com/kinnotamadx", "blk": "A", "num": 1, "sfx": "ab"}, {"id": "Day2|A07ab", "p": "A07ab", "n": "みいむい", "d": "Day2", "h": "東7", "pr": "絶対", "sell": "", "memo": "", "buy": "要確認", "url": "https://x.com/kanzarinsan", "blk": "A", "num": 7, "sfx": "ab"}, {"id": "Day2|A09ab", "p": "A09ab", "n": "ぽよぽよスカイ", "d": "Day2", "h": "東7", "pr": "まあまあ", "sell": "", "memo": "", "buy": "", "url": "https://x.com/sae_sky77", "blk": "A", "num": 9, "sfx": "ab"}, {"id": "Day2|A22ab", "p": "A22ab", "n": "きのこむ神", "d": "Day2", "h": "東7", "pr": "まあまあ", "sell": "13:06", "memo": "", "buy": "", "url": "https://x.com/kinokomusin", "blk": "A", "num": 22, "sfx": "ab"}, {"id": "Day2|A24ab", "p": "A24ab", "n": "Frenchletter", "d": "Day2", "h": "東7", "pr": "できれば", "sell": "", "memo": "", "buy": "要確認", "url": "https://x.com/pedori3", "blk": "A", "num": 24, "sfx": "ab"}, {"id": "Day2|A29a", "p": "A29a", "n": "rei'sroom", "d": "Day2", "h": "東7", "pr": "できれば", "sell": "", "memo": "", "buy": "要確認", "url": "", "blk": "A", "num": 29, "sfx": "a"}, {"id": "Day2|A33b", "p": "A33b", "n": "ETERNAL LAND", "d": "Day2", "h": "東7", "pr": "できれば", "sell": "14:01", "memo": "", "buy": "要確認", "url": "https://x.com/6U_s", "blk": "A", "num": 33, "sfx": "b"}, {"id": "Day2|A36a", "p": "A36a", "n": "いちごさいず", "d": "Day2", "h": "東7", "pr": "まあまあ", "sell": "", "memo": "ブックマークから追加（1日目 A44ab 東7 あり、作家：なつめえり）", "buy": "要確認", "url": "https://x.com/erisize", "blk": "A", "num": 36, "sfx": "a"}, {"id": "Day2|A50ab", "p": "A50ab", "n": "さぁくるたべもの", "d": "Day2", "h": "東7", "pr": "絶対", "sell": "", "memo": "", "buy": "要確認", "url": "", "blk": "A", "num": 50, "sfx": "ab"}, {"id": "Day2|B25ab", "p": "B25ab", "n": "乙桜しずく", "d": "Day2", "h": "東7", "pr": "絶対", "sell": "", "memo": "ブックマークから追加", "buy": "要確認", "url": "https://x.com/rcos0", "blk": "B", "num": 25, "sfx": "ab"}, {"id": "Day2|B27b", "p": "B27b", "n": "ゆもび", "d": "Day2", "h": "東7", "pr": "まあまあ", "sell": "", "memo": "", "buy": "", "url": "", "blk": "B", "num": 27, "sfx": "b"}, {"id": "Day2|H06a", "p": "H06a", "n": "ゆにおんばすと", "d": "Day2", "h": "東7", "pr": "できれば", "sell": "", "memo": "", "buy": "要確認", "url": "https://x.com/kaz862", "blk": "H", "num": 6, "sfx": "a"}, {"id": "Day2|P12a", "p": "P12a", "n": "ホロナミンZ", "d": "Day2", "h": "東7", "pr": "できれば", "sell": "", "memo": "", "buy": "要確認", "url": "", "blk": "P", "num": 12, "sfx": "a"}, {"id": "Day2|Q02b", "p": "Q02b", "n": "餅屋", "d": "Day2", "h": "東7", "pr": "できれば", "sell": "", "memo": "", "buy": "要確認", "url": "", "blk": "Q", "num": 2, "sfx": "b"}, {"id": "Day2|Q04b", "p": "Q04b", "n": "milkberry", "d": "Day2", "h": "東7", "pr": "できれば", "sell": "", "memo": "", "buy": "要確認", "url": "", "blk": "Q", "num": 4, "sfx": "b"}, {"id": "Day2|Q06b", "p": "Q06b", "n": "埋葬ノ底", "d": "Day2", "h": "東7", "pr": "絶対", "sell": "", "memo": "", "buy": "要確認", "url": "", "blk": "Q", "num": 6, "sfx": "b"}, {"id": "Day2|W01b", "p": "W01b", "n": "じがへるつ号房", "d": "Day2", "h": "東7", "pr": "まあまあ", "sell": "", "memo": "", "buy": "", "url": "", "blk": "W", "num": 1, "sfx": "b"}, {"id": "Day2|あ52ab", "p": "あ52ab", "n": "white parabellum", "d": "Day2", "h": "西", "pr": "絶対", "sell": "13:56", "memo": "", "buy": "要確認", "url": "https://x.com/lemon_mito", "blk": "あ", "num": 52, "sfx": "ab"}, {"id": "Day2|あ54ab", "p": "あ54ab", "n": "vividcolor", "d": "Day2", "h": "西", "pr": "まあまあ", "sell": "", "memo": "", "buy": "", "url": "https://x.com/ponkan_8", "blk": "あ", "num": 54, "sfx": "ab"}, {"id": "Day2|あ56ab", "p": "あ56ab", "n": "Lunaberry", "d": "Day2", "h": "西", "pr": "まあまあ", "sell": "13:29", "memo": "", "buy": "", "url": "https://x.com/nanananaaannaa", "blk": "あ", "num": 56, "sfx": "ab"}, {"id": "Day2|あ57a", "p": "あ57a", "n": "Confeito", "d": "Day2", "h": "西", "pr": "できれば", "sell": "", "memo": "旧表記 fonfeito を Confeito に修正（@miru_9Q）", "buy": "要確認", "url": "https://x.com/miru_9Q", "blk": "あ", "num": 57, "sfx": "a"}, {"id": "Day2|は27ab", "p": "は27ab", "n": "STUDIO KATANABLADE", "d": "Day2", "h": "西", "pr": "絶対", "sell": "13:34", "memo": "", "buy": "要確認", "url": "https://x.com/HOooooZY", "blk": "は", "num": 27, "sfx": "ab"}, {"id": "Day2|は36b", "p": "は36b", "n": "pecora room", "d": "Day2", "h": "西", "pr": "まあまあ", "sell": "", "memo": "", "buy": "", "url": "https://x.com/nagi_37se", "blk": "は", "num": 36, "sfx": "b"}, {"id": "Day2|ふ48b", "p": "ふ48b", "n": "Pastel Craft", "d": "Day2", "h": "西", "pr": "まあまあ", "sell": "", "memo": "", "buy": "", "url": "https://x.com/mizukoshi14", "blk": "ふ", "num": 48, "sfx": "b"}, {"id": "Day2|へ03ab", "p": "へ03ab", "n": "いちごまみれあ!!", "d": "Day2", "h": "西", "pr": "まあまあ", "sell": "", "memo": "", "buy": "", "url": "https://x.com/mirea_fraise", "blk": "へ", "num": 3, "sfx": "ab"}, {"id": "Day2|へ10a", "p": "へ10a", "n": "あろあ", "d": "Day2", "h": "西", "pr": "できれば", "sell": "", "memo": "", "buy": "要確認", "url": "", "blk": "へ", "num": 10, "sfx": "a"}, {"id": "Day2|へ11ab", "p": "へ11ab", "n": "ホワイトリレーション", "d": "Day2", "h": "西", "pr": "まあまあ", "sell": "", "memo": "", "buy": "", "url": "https://x.com/mashiroKta", "blk": "へ", "num": 11, "sfx": "ab"}, {"id": "Day2|へ27ab", "p": "へ27ab", "n": "三食納豆飯", "d": "Day2", "h": "西", "pr": "できれば", "sell": "12:45", "memo": "", "buy": "要確認", "url": "https://x.com/rag_ragko", "blk": "へ", "num": 27, "sfx": "ab"}, {"id": "Day2|へ30b", "p": "へ30b", "n": "きざみきゃらめる", "d": "Day2", "h": "西", "pr": "できれば", "sell": "", "memo": "", "buy": "要確認", "url": "https://x.com/ArameDraw", "blk": "へ", "num": 30, "sfx": "b"}, {"id": "Day2|ほ33a", "p": "ほ33a", "n": "seventhrun", "d": "Day2", "h": "西", "pr": "未分類", "sell": "", "memo": "", "buy": "", "url": "", "blk": "ほ", "num": 33, "sfx": "a"}, {"id": "Day2|ほ46b", "p": "ほ46b", "n": "neiran", "d": "Day2", "h": "西", "pr": "未分類", "sell": "", "memo": "", "buy": "", "url": "", "blk": "ほ", "num": 46, "sfx": "b"}, {"id": "Day2|め04a", "p": "め04a", "n": "銀色鈴蘭", "d": "Day2", "h": "西", "pr": "未分類", "sell": "", "memo": "", "buy": "", "url": "https://x.com/majamari17", "blk": "め", "num": 4, "sfx": "a"}, {"id": "Day2|め05ab", "p": "め05ab", "n": "悲しみのアリス", "d": "Day2", "h": "西", "pr": "未分類", "sell": "", "memo": "", "buy": "", "url": "", "blk": "め", "num": 5, "sfx": "ab"}, {"id": "Day2|め21ab", "p": "め21ab", "n": "あさひあげ", "d": "Day2", "h": "西", "pr": "未分類", "sell": "", "memo": "", "buy": "", "url": "https://x.com/poco__", "blk": "め", "num": 21, "sfx": "ab"}, {"id": "Day2|め22ab", "p": "め22ab", "n": "Chocomonaka", "d": "Day2", "h": "西", "pr": "未分類", "sell": "", "memo": "", "buy": "", "url": "https://x.com/curl_Q_", "blk": "め", "num": 22, "sfx": "ab"}, {"id": "Day2|め30ab", "p": "め30ab", "n": "elseif", "d": "Day2", "h": "西", "pr": "未分類", "sell": "", "memo": "", "buy": "", "url": "", "blk": "め", "num": 30, "sfx": "ab"}, {"id": "Day2|め44ab", "p": "め44ab", "n": "ラジアルエンジン", "d": "Day2", "h": "西", "pr": "未分類", "sell": "13:04", "memo": "", "buy": "", "url": "https://x.com/fuumiisc", "blk": "め", "num": 44, "sfx": "ab"}, {"id": "Day2|め45ab", "p": "め45ab", "n": "hitenkei", "d": "Day2", "h": "西", "pr": "絶対", "sell": "14:15", "memo": "", "buy": "要確認", "url": "https://x.com/HitenKei", "blk": "め", "num": 45, "sfx": "ab"}, {"id": "Day2|め48ab", "p": "め48ab", "n": "Molamola", "d": "Day2", "h": "西", "pr": "未分類", "sell": "", "memo": "", "buy": "", "url": "https://x.com/nimono_", "blk": "め", "num": 48, "sfx": "ab"}, {"id": "Day2|め52ab", "p": "め52ab", "n": "モクモクセイ", "d": "Day2", "h": "西", "pr": "できれば", "sell": "14:36", "memo": "", "buy": "要確認", "url": "", "blk": "め", "num": 52, "sfx": "ab"}, {"id": "Day2|め54ab", "p": "め54ab", "n": "てれたにあ", "d": "Day2", "h": "西", "pr": "未分類", "sell": "", "memo": "", "buy": "", "url": "https://x.com/teren_mikami", "blk": "め", "num": 54, "sfx": "ab"}, {"id": "Day2|め57ab", "p": "め57ab", "n": "canvas", "d": "Day2", "h": "西", "pr": "できれば", "sell": "13:55", "memo": "", "buy": "要確認", "url": "", "blk": "め", "num": 57, "sfx": "ab"}, {"id": "Day2|め66ab", "p": "め66ab", "n": "とりかごすてっぷ", "d": "Day2", "h": "西", "pr": "未分類", "sell": "", "memo": "", "buy": "", "url": "https://x.com/haruhiruri", "blk": "め", "num": 66, "sfx": "ab"}];
+const KEY = 'c108_v1';
+const PR = {'絶対':0,'できれば':1,'まあまあ':2,'未分類':3,'未設定':4};
+const HALLS = ['東1-3','東7','西','南','不明'];
+const ST = ['未購入','確保','完売','スキップ'];
+
+let db = load();
+let tab = 'Day1', sortMode = 'place', hideDone = false, query = '';
+
+function load(){
+  try{
+    const r = JSON.parse(localStorage.getItem(KEY));
+    if(r && r.status) return r;
+  }catch(e){}
+  return {status:{}, memo:{}, added:[]};
+}
+function save(){
+  try{ localStorage.setItem(KEY, JSON.stringify(db)); }
+  catch(e){ alert('保存に失敗しました。空き容量を確認してください。'); }
+}
+
+/* ---------- rendering ---------- */
+function timeClass(t){
+  if(!t) return '';
+  const h = parseInt(t.split(':')[0],10);
+  if(isNaN(h)) return '';
+  return h < 12 ? 'e' : h < 13 ? 'm' : 'l';
+}
+function matches(r){
+  if(!query) return true;
+  const q = query.toLowerCase();
+  return (r.p+' '+r.n).toLowerCase().includes(q);
+}
+function rowsFor(day){
+  let rs = DATA.filter(r => r.d === day && matches(r));
+  if(sortMode === 'place'){
+    rs.sort((a,b) => HALLS.indexOf(a.h)-HALLS.indexOf(b.h)
+      || a.blk.localeCompare(b.blk,'ja') || a.num-b.num || a.sfx.localeCompare(b.sfx));
+  }else{
+    rs.sort((a,b) => HALLS.indexOf(a.h)-HALLS.indexOf(b.h)
+      || PR[a.pr]-PR[b.pr]
+      || a.blk.localeCompare(b.blk,'ja') || a.num-b.num || a.sfx.localeCompare(b.sfx));
+  }
+  return rs;
+}
+function esc(s){ return (s||'').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+function render(){
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('on', t.dataset.tab === tab));
+  document.getElementById('ctl').style.display = tab === 'ADD' ? 'none' : '';
+  const main = document.getElementById('main');
+
+  if(tab === 'ADD'){ main.innerHTML = addHTML(); bindAdd(); return; }
+
+  const rs = rowsFor(tab);
+  const all = DATA.filter(r => r.d === tab);
+  const z = all.filter(r => r.pr === '絶対');
+  const zLeft = z.filter(r => (db.status[r.id]||0) === 0).length;
+  const done = all.filter(r => (db.status[r.id]||0) !== 0).length;
+  document.getElementById('count').innerHTML =
+    `絶対 残り <b>${zLeft}</b>/${z.length}　・　全体 ${done}/${all.length}`;
+
+  let html = '', hall = null;
+  const vis = rs.filter(r => !(hideDone && (db.status[r.id]||0) !== 0));
+  if(!vis.length){ main.innerHTML = '<div class="empty">該当する行がありません</div>'; return; }
+  for(const r of vis){
+    if(r.h !== hall){
+      hall = r.h;
+      const n = vis.filter(x => x.h === hall).length;
+      html += `<div class="hall"><b>${esc(hall)}</b><span>${n}件</span></div>`;
+    }
+    const s = db.status[r.id]||0;
+    const tc = timeClass(r.sell);
+    const sub = [];
+    if(r.sell) sub.push(`<span class="t ${tc}">～${esc(r.sell)}</span>`);
+    sub.push(`<span>${esc(r.pr)}</span>`);
+    if(r.url) sub.push('<span>X</span>');
+    if(db.memo[r.id]) sub.push('<span>メモ</span>');
+    html += `<div class="row p${Math.min(PR[r.pr],3)} s${s}" data-id="${esc(r.id)}">
+      <div class="chip">${esc(r.p)}</div>
+      <div class="body">
+        <div class="nm${r.n?'':' none'}">${esc(r.n||'（名称未取得）')}</div>
+        <div class="sub">${sub.join('')}</div>
+      </div>
+      <div class="st">${ST[s].slice(0,3)}</div>
+    </div>`;
+  }
+  main.innerHTML = html;
+  main.querySelectorAll('.row').forEach(el =>
+    el.addEventListener('click', () => openSheet(el.dataset.id)));
+}
+
+/* ---------- sheet ---------- */
+let cur = null;
+function openSheet(id){
+  cur = DATA.find(r => r.id === id);
+  if(!cur) return;
+  const s = db.status[id]||0;
+  const cls = ['b3','b1','b2','b3'];
+  document.getElementById('sheet').innerHTML = `
+    <div class="sh">
+      <div class="chip">${esc(cur.p)}</div>
+      <div class="body"><div class="nm">${esc(cur.n||'（名称未取得）')}</div>
+      <div class="sub"><span>${esc(cur.h)}</span><span>${esc(cur.pr)}</span>
+      ${cur.sell?`<span class="t ${timeClass(cur.sell)}">過去の完売 ～${esc(cur.sell)}</span>`:''}</div></div>
+    </div>
+    <div class="grid">
+      ${ST.map((t,i)=>`<button class="btn ${cls[i]} ${i===s?'sel':''}" data-s="${i}">${t}</button>`).join('')}
+    </div>
+    ${cur.url
+      ? `<a class="lnk" href="${esc(cur.url)}" target="_blank" rel="noopener">Xで開く（要通信）</a>`
+      : `<div class="lnk off">Twitter URL なし</div>`}
+    <label class="f">メモ</label>
+    <textarea id="mm" rows="2" placeholder="買ったもの、次回への申し送りなど">${esc(db.memo[cur.id]||'')}</textarea>
+    ${cur.memo?`<div class="hint">Notion側メモ：${esc(cur.memo)}</div>`:''}
+    <button class="btn wide" id="close" style="margin-top:12px">閉じる</button>`;
+
+  document.getElementById('sheet').querySelectorAll('[data-s]').forEach(b =>
+    b.addEventListener('click', () => {
+      db.status[cur.id] = +b.dataset.s; save(); closeSheet(); render();
+    }));
+  document.getElementById('mm').addEventListener('input', e => {
+    const v = e.target.value.trim();
+    if(v) db.memo[cur.id] = v; else delete db.memo[cur.id];
+    save();
+  });
+  document.getElementById('close').addEventListener('click', closeSheet);
+  document.getElementById('sheet').classList.add('on');
+  document.getElementById('scrim').classList.add('on');
+}
+function closeSheet(){
+  document.getElementById('sheet').classList.remove('on');
+  document.getElementById('scrim').classList.remove('on');
+  render();
+}
+document.getElementById('scrim').addEventListener('click', closeSheet);
+
+/* ---------- add tab ---------- */
+function hallOf(p){
+  const c = p.trim()[0];
+  if(!c) return '';
+  if(/[ぁ-ゖ]/.test(c)) return '西';
+  if(/[ァ-ヶ]/.test(c)) return '東1-3';
+  if(/[A-Z]/.test(c)) return '東7';
+  if(/[a-z]/.test(c)) return '南';
+  return '';
+}
+function addHTML(){
+  const list = db.added.map((a,i)=>`
+    <div class="card">
+      <div class="sh" style="margin:0">
+        <div class="chip">${esc(a.p)}</div>
+        <div class="body"><div class="nm${a.n?'':' none'}">${esc(a.n||'（名称なし）')}</div>
+        <div class="sub"><span class="pill">${esc(a.d)}</span><span class="pill">${esc(a.h||'ホール不明')}</span></div>
+        ${a.m?`<div class="hint">${esc(a.m)}</div>`:''}</div>
+        <button class="mini" data-del="${i}">削除</button>
+      </div>
+    </div>`).join('');
+  return `
+    <div class="card">
+      <label class="f">配置（必須）</label>
+      <input id="ap" type="text" placeholder="例：ア07ab / A32ab / め45ab / a39a" autocomplete="off">
+      <div class="hint" id="ah">ホールは配置から自動判定します</div>
+      <label class="f">サークル名（任意）</label>
+      <input id="an" type="text" autocomplete="off">
+      <label class="f">日程</label>
+      <div class="grid" style="margin-top:6px">
+        <button class="btn b3 sel" data-d="Day1">Day1</button>
+        <button class="btn b3" data-d="Day2">Day2</button>
+      </div>
+      <label class="f">メモ（任意）</label>
+      <textarea id="am" rows="2" placeholder="買ったもの、名簿に入れるか等"></textarea>
+      <button class="add" id="addBtn" disabled>追加する</button>
+    </div>
+    <div class="hall"><b>買った分</b><span>${db.added.length}件</span></div>
+    ${list || '<div class="empty">まだありません</div>'}
+    <button class="btn wide" id="exp" style="margin-top:20px">Notionへ戻す用に書き出す</button>`;
+}
+function bindAdd(){
+  let day = 'Day1';
+  const ap = document.getElementById('ap'), btn = document.getElementById('addBtn');
+  const upd = () => {
+    const v = ap.value.trim();
+    btn.disabled = !v;
+    document.getElementById('ah').textContent =
+      v ? (hallOf(v) ? 'ホール：' + hallOf(v) : 'ホールを判定できません（後で補完してください）')
+        : 'ホールは配置から自動判定します';
+  };
+  ap.addEventListener('input', upd);
+  document.querySelectorAll('[data-d]').forEach(b => b.addEventListener('click', () => {
+    day = b.dataset.d;
+    document.querySelectorAll('[data-d]').forEach(x => x.classList.toggle('sel', x === b));
+  }));
+  btn.addEventListener('click', () => {
+    const p = ap.value.trim();
+    if(!p) return;
+    db.added.push({p, n:document.getElementById('an').value.trim(),
+      m:document.getElementById('am').value.trim(), d:day, h:hallOf(p)});
+    save(); render();
+  });
+  document.querySelectorAll('[data-del]').forEach(b => b.addEventListener('click', () => {
+    if(confirm('この行を削除しますか')){ db.added.splice(+b.dataset.del,1); save(); render(); }
+  }));
+  document.getElementById('exp').addEventListener('click', exportText);
+}
+
+/* ---------- export ---------- */
+function exportText(){
+  const chg = DATA.filter(r => (db.status[r.id]||0) !== 0 || db.memo[r.id]);
+  let t = `C108 巡回結果　書き出し ${new Date().toLocaleString('ja-JP')}\n`;
+  t += `\n===== 1. 状況の変更（${chg.length}件）=====\n`;
+  t += chg.length ? chg.map(r =>
+    `${r.d}\t${r.p}\t${r.n}\t${ST[db.status[r.id]||0]}${db.memo[r.id]?'\t'+db.memo[r.id]:''}`
+  ).join('\n') : '（なし）';
+  t += `\n\n===== 2. 新規購入（${db.added.length}件）=====\n`;
+  t += db.added.length ? db.added.map(a =>
+    `${a.d}\t${a.p}\t${a.n}\t${a.h}\t108${a.m?'\t'+a.m:''}`
+  ).join('\n') : '（なし）';
+  t += `\n\n（列：日程／配置／サークル名／状況またはホール／…）\n`;
+
+  const sh = document.getElementById('sheet');
+  sh.innerHTML = `<div class="sh"><div class="body"><div class="nm">書き出し</div>
+    <div class="sub"><span>長押しで全選択してコピーできます</span></div></div></div>
+    <pre id="pre">${esc(t)}</pre>
+    <div class="grid" style="margin-top:10px">
+      <button class="btn b1" id="cp">コピー</button>
+      <button class="btn b3" id="cl">閉じる</button>
+    </div>`;
+  sh.classList.add('on');
+  document.getElementById('scrim').classList.add('on');
+  document.getElementById('cl').addEventListener('click', closeSheet);
+  document.getElementById('cp').addEventListener('click', async () => {
+    try{ await navigator.clipboard.writeText(t); document.getElementById('cp').textContent = 'コピーしました'; }
+    catch(e){ document.getElementById('cp').textContent = '長押しで選択してください'; }
+  });
+}
+
+/* ---------- controls ---------- */
+document.querySelectorAll('.tab').forEach(t =>
+  t.addEventListener('click', () => { tab = t.dataset.tab; query=''; document.getElementById('q').value=''; window.scrollTo(0,0); render(); }));
+document.getElementById('q').addEventListener('input', e => { query = e.target.value.trim(); render(); });
+document.getElementById('sortBtn').addEventListener('click', e => {
+  sortMode = sortMode === 'place' ? 'pri' : 'place';
+  e.target.textContent = sortMode === 'place' ? '配置順' : '優先度順';
+  e.target.classList.toggle('on', sortMode === 'pri');
+  render();
+});
+document.getElementById('hideBtn').addEventListener('click', e => {
+  hideDone = !hideDone; e.target.classList.toggle('on', hideDone); render();
+});
+document.getElementById('themeBtn').addEventListener('click', e => {
+  document.body.classList.toggle('light');
+  e.target.textContent = document.body.classList.contains('light') ? '暗' : '明';
+});
+
+window.addEventListener('error', function(ev){
+  var e = document.getElementById('err');
+  e.style.display = 'block';
+  e.textContent = 'エラー：' + ev.message + ' @' + (ev.lineno || '?');
+});
+if('serviceWorker' in navigator){
+  window.addEventListener('load', function(){
+    navigator.serviceWorker.register('sw.js').catch(function(){});
+  });
+}
+render();
+</script>
+</body>
+</html>
