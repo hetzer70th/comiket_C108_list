@@ -1,7 +1,7 @@
 // C108 巡回リスト オフライン用 Service Worker
-// 方針：初回に全ファイルをキャッシュし、以後はキャッシュを最優先で返す。
-// 会場で通信が不安定でも、キャッシュがあれば必ず起動する。
-const CACHE = 'c108-v2';
+// 方針：通信があれば新しい版を取りに行き、取れなければキャッシュを使う。
+// これにより「更新が反映されない」を避けつつ、会場ではオフラインで動く。
+const CACHE = 'c108-v3';
 const FILES = [
   './',
   './index.html',
@@ -11,7 +11,11 @@ const FILES = [
 ];
 
 self.addEventListener('install', e => {
-  e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES)).then(() => self.skipWaiting()));
+  e.waitUntil(
+    caches.open(CACHE)
+      .then(c => c.addAll(FILES))
+      .then(() => self.skipWaiting())
+  );
 });
 
 self.addEventListener('activate', e => {
@@ -22,12 +26,21 @@ self.addEventListener('activate', e => {
   );
 });
 
+// network-first：まず通信、ダメならキャッシュ
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
   e.respondWith(
-    caches.match(e.request, { ignoreSearch: true }).then(hit => {
-      if (hit) return hit;
-      return fetch(e.request).catch(() => caches.match('./index.html'));
-    })
+    fetch(e.request)
+      .then(res => {
+        if (res && res.ok) {
+          const copy = res.clone();
+          caches.open(CACHE).then(c => c.put(e.request, copy)).catch(() => {});
+        }
+        return res;
+      })
+      .catch(() =>
+        caches.match(e.request, { ignoreSearch: true })
+          .then(hit => hit || caches.match('./index.html'))
+      )
   );
 });
