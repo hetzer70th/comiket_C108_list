@@ -94,6 +94,16 @@ main{padding:10px 10px 96px}
 .row.s2{opacity:.42} .row.s2 .st{background:var(--gone);color:#ffd9e0}
 .row.s3{opacity:.32} .row.s3 .st{background:var(--skipc);color:var(--mute)}
 .empty{color:var(--dim);text-align:center;padding:40px 10px;font-size:14px}
+
+/* ---- 相対軸（右ボーダー）：残り時間で色が変わる ---- */
+.row{border-right:5px solid transparent}
+.row.u1{border-right-color:#ffd21f}  /* 注意：残り30〜60分 */
+.row.u2{border-right-color:#ff3d68}  /* 危険：残り30分未満 */
+.row.u3{border-right-color:#a855f7}  /* 目安超過 */
+.rem{font-weight:800;font-variant-numeric:tabular-nums}
+.rem.u1{color:#ffd21f}
+.rem.u2{color:#ff3d68}
+.rem.u3{color:#c084fc}
 .badge{
   display:inline-block;padding:2px 7px;border-radius:20px;font-size:10px;font-weight:800;
   background:#2a3d29;color:#a8e6a1;border:1px solid #3d5a3b;margin-right:6px;flex-shrink:0;
@@ -274,6 +284,49 @@ function rowsFor(day){
   }
   return rs;
 }
+/* ---------- 相対軸（現在時刻との距離） ---------- */
+const OPEN_MIN = 10 * 60 + 30;   // 開場 10:30
+const CLOSE_MIN = 15 * 60;       // 閉場 15:00
+const EVENT_DATES = { 'Day1': '2026-08-15', 'Day2': '2026-08-16' };
+
+// 動作確認用：?test=Day1@11:40 のように指定すると、その日時として扱う
+const TEST = (function(){
+  const m = location.search.match(/[?&]test=(Day[12])@(\d{1,2}):(\d{2})/);
+  return m ? { day: m[1], min: (+m[2]) * 60 + (+m[3]) } : null;
+})();
+
+function nowMin(){
+  const d = new Date();
+  return { min: d.getHours() * 60 + d.getMinutes(), date: fmtDate(d) };
+}
+function fmtDate(d){
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0')
+    + '-' + String(d.getDate()).padStart(2,'0');
+}
+// 相対軸を動かしてよい状況か（今日がそのDayで、かつ会期時間内）
+function liveFor(day){
+  if(TEST){
+    if(TEST.day !== day) return null;
+    return (TEST.min < OPEN_MIN || TEST.min > CLOSE_MIN) ? null : TEST.min;
+  }
+  const n = nowMin();
+  if(EVENT_DATES[day] !== n.date) return null;
+  if(n.min < OPEN_MIN || n.min > CLOSE_MIN) return null;
+  return n.min;
+}
+// 戻り値 {u:0..3, label:''}
+function urgency(row, live){
+  if(live === null || !row.sell) return { u:0, label:'' };
+  const m = row.sell.match(/^(\d{1,2}):(\d{2})/);
+  if(!m) return { u:0, label:'' };
+  const target = (+m[1]) * 60 + (+m[2]);
+  const diff = target - live;
+  if(diff < 0) return { u:3, label:'目安超過' };
+  if(diff < 30) return { u:2, label:'あと' + diff + '分' };
+  if(diff < 60) return { u:1, label:'あと' + diff + '分' };
+  return { u:0, label:'' };
+}
+
 function esc(s){ return (s||'').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 
 function render(){
@@ -292,6 +345,7 @@ function render(){
     `絶対 残り <b>${zLeft}</b>/${z.length}　・　全体 ${done}/${all.length}`;
 
   let html = '', hall = null;
+  const live = liveFor(tab);
   const vis = rs.filter(r => !(hideDone && (db.status[r.id]||0) !== 0));
   if(!vis.length){ main.innerHTML = '<div class="empty">該当する行がありません</div>'; return; }
   for(const r of vis){
@@ -302,14 +356,17 @@ function render(){
     }
     const s = db.status[r.id]||0;
     const tc = timeClass(r.sell);
+    // 済・完売・スキップ済の行は急かさない
+    const ug = (s === 0) ? urgency(r, live) : { u:0, label:'' };
     const sub = [];
     if(r.sell) sub.push(`<span class="t ${tc}">～${esc(r.sell)}</span>`);
+    if(ug.label) sub.push(`<span class="rem u${ug.u}">${esc(ug.label)}</span>`);
     sub.push(`<span>${esc(r.pr)}</span>`);
     if(r.url) sub.push('<span>X</span>');
     if(db.memo[r.id]) sub.push('<span>メモ</span>');
     const img = (r.img && r.img.length)
       ? `<img class="thumb" src="${encodeURIComponent(r.img[0])}" alt="" loading="lazy">` : '';
-    html += `<div class="row p${Math.min(PR[r.pr],3)} s${s}" data-id="${esc(r.id)}">
+    html += `<div class="row p${Math.min(PR[r.pr],3)} s${s}${ug.u?' u'+ug.u:''}" data-id="${esc(r.id)}">
       <div class="chip">${esc(r.p)}</div>
       <div class="body">
         <div class="nm${r.n?'':' none'}">${r.added?'<span class="badge">追加</span>':''}${esc(r.n||'（名称未取得）')}</div>
@@ -535,6 +592,21 @@ document.getElementById('hideBtn').addEventListener('click', e => {
 document.getElementById('themeBtn').addEventListener('click', e => {
   document.body.classList.toggle('light');
   e.target.textContent = document.body.classList.contains('light') ? '暗' : '明';
+});
+
+// 相対軸を1分ごとに再評価。シートや画像を開いている間は再描画しない
+setInterval(function(){
+  if(tab === 'ADD') return;
+  if(document.getElementById('sheet').classList.contains('on')) return;
+  if(document.getElementById('viewer').classList.contains('on')) return;
+  if(document.activeElement && document.activeElement.id === 'q') return;
+  render();
+}, 60000);
+// 復帰時（バックグラウンドから戻ったとき）にも即更新
+document.addEventListener('visibilitychange', function(){
+  if(!document.hidden && tab !== 'ADD'
+     && !document.getElementById('sheet').classList.contains('on')
+     && !document.getElementById('viewer').classList.contains('on')) render();
 });
 
 window.addEventListener('error', function(ev){
