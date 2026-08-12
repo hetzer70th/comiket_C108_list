@@ -308,7 +308,7 @@ function render(){
     if(r.url) sub.push('<span>X</span>');
     if(db.memo[r.id]) sub.push('<span>メモ</span>');
     const img = (r.img && r.img.length)
-      ? `<img class="thumb" src="img/${encodeURIComponent(r.img[0])}" alt="" loading="lazy">` : '';
+      ? `<img class="thumb" src="${encodeURIComponent(r.img[0])}" alt="" loading="lazy">` : '';
     html += `<div class="row p${Math.min(PR[r.pr],3)} s${s}" data-id="${esc(r.id)}">
       <div class="chip">${esc(r.p)}</div>
       <div class="body">
@@ -345,7 +345,7 @@ function openSheet(id){
       ${PRIS.map(p=>`<button class="btn b3 ${p===cur.pr?'sel':''}" data-pri="${p}">${p}</button>`).join('')}
     </div>` : ''}
     ${(cur.img && cur.img.length) ? `<div class="oshi">${cur.img.map(f=>
-      `<img src="img/${encodeURIComponent(f)}" alt="お品書き" data-full="img/${encodeURIComponent(f)}" loading="lazy">`
+      `<img src="${encodeURIComponent(f)}" alt="お品書き" data-full="${encodeURIComponent(f)}" loading="lazy">`
     ).join('')}</div>` : ''}
     <label class="f" style="margin-top:14px">状況</label>
     <div class="grid" style="margin-top:6px">
