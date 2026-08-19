@@ -125,9 +125,11 @@ main{padding:10px 10px 96px}
   background:#2a3d29;color:#a8e6a1;border:1px solid #3d5a3b;margin-right:6px;flex-shrink:0;
 }
 .oshi{margin-top:10px;display:flex;gap:8px;overflow-x:auto;-webkit-overflow-scrolling:touch}
+.oshiwrap{position:relative;flex-shrink:0;line-height:0}
+.oshiwrap canvas{position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none}
 .oshi img{
   height:190px;border-radius:9px;border:1px solid var(--line);
-  background:var(--panel2);flex-shrink:0;cursor:zoom-in;
+  background:var(--panel2);flex-shrink:0;cursor:zoom-in;display:block;
 }
 .thumb{
   width:46px;height:46px;object-fit:cover;border-radius:6px;
@@ -504,6 +506,39 @@ function loadPicURL(key){
   }).catch(() => null);
 }
 
+// 線を描く共通処理。座標は正規化されているのでどのサイズでも同じ形になる
+function drawStrokes(ctx, list, w, h){
+  ctx.strokeStyle = '#ff2d20';
+  ctx.lineWidth = Math.max(1.5, w * 0.012);
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  for(const st of list){
+    if(st.length < 2) continue;
+    ctx.beginPath();
+    ctx.moveTo(st[0][0] * w, st[0][1] * h);
+    for(let i = 1; i < st.length; i++) ctx.lineTo(st[i][0] * w, st[i][1] * h);
+    ctx.stroke();
+  }
+}
+// サムネイルに手書きを重ねる
+function paintThumb(wrap, name){
+  const img = wrap.querySelector('img'), cv = wrap.querySelector('canvas');
+  idbGet('draw', name).then(list => {
+    if(!list || !list.length) return;
+    const go = () => {
+      const w = img.clientWidth, h = img.clientHeight;
+      if(!w || !h) { setTimeout(go, 60); return; }
+      const dpr = window.devicePixelRatio || 1;
+      cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr);
+      const ctx = cv.getContext('2d');
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.clearRect(0, 0, w, h);
+      drawStrokes(ctx, list, w, h);
+    };
+    if(img.complete) go(); else img.onload = go;
+  }).catch(() => {});
+}
+
 // 追加画像は長辺1400pxに縮めて保存（容量を抑える）
 function shrinkImage(file, max){
   max = max || 1400;
@@ -681,7 +716,7 @@ function openSheet(id){
       ${PRIS.map(p=>`<button class="btn b3 ${p===cur.pr?'sel':''}" data-pri="${p}">${p}</button>`).join('')}
     </div>` : ''}
     ${imgsOf(cur).length ? `<div class="oshi">${imgsOf(cur).map((f,i)=>
-      `<img data-i="${i}" alt="お品書き" loading="lazy">`
+      `<div class="oshiwrap" data-i="${i}"><img alt="お品書き" loading="lazy"><canvas></canvas></div>`
     ).join('')}</div>` : ''}
     <button class="btn wide b3" id="addPic" style="margin-top:10px">＋ お品書きを写真から追加</button>
     <input type="file" id="picFile" accept="image/*" style="display:none">
@@ -753,12 +788,13 @@ function openSheet(id){
       save(); openSheet(id);
     });
   }
-  // お品書きサムネイル（追加画像は非同期で解決）
+  // お品書きサムネイル（追加画像は非同期で解決／手書きも重ねる）
   const list = imgsOf(cur);
-  document.getElementById('sheet').querySelectorAll('.oshi img').forEach(im => {
-    const i = +im.dataset.i;
-    srcFor(list[i]).then(u => { if(u) im.src = u; });
-    im.addEventListener('click', () => openViewer(list, i));
+  document.getElementById('sheet').querySelectorAll('.oshiwrap').forEach(wrap => {
+    const i = +wrap.dataset.i;
+    const im = wrap.querySelector('img');
+    srcFor(list[i]).then(u => { if(u){ im.src = u; paintThumb(wrap, list[i]); } });
+    wrap.addEventListener('click', () => openViewer(list, i));
   });
   // 写真から追加
   const fi = document.getElementById('picFile');
@@ -826,6 +862,8 @@ function closeViewer(){
   document.getElementById('vnext').style.display = 'none';
   document.getElementById('vimg').src = '';
   unlockBody();
+  // シートが開いたままなら、書き込み結果をサムネイルへ反映するため作り直す
+  if(cur && document.getElementById('sheet').classList.contains('on')) openSheet(cur.id);
   render();
 }
 
@@ -846,17 +884,7 @@ function redraw(){
   if(!f) { setTimeout(redraw, 60); return; }   // 画像がまだ描画されていない
   const { ctx, w, h } = f;
   ctx.clearRect(0, 0, w, h);
-  ctx.strokeStyle = '#ff2d20';
-  ctx.lineWidth = 4;
-  ctx.lineCap = 'round';
-  ctx.lineJoin = 'round';
-  for(const st of strokes){
-    if(st.length < 2) continue;
-    ctx.beginPath();
-    ctx.moveTo(st[0][0] * w, st[0][1] * h);
-    for(let i = 1; i < st.length; i++) ctx.lineTo(st[i][0] * w, st[i][1] * h);
-    ctx.stroke();
-  }
+  drawStrokes(ctx, strokes, w, h);
 }
 function setDraw(on){
   drawMode = on;
