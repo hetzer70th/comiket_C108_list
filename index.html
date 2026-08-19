@@ -138,11 +138,24 @@ main{padding:10px 10px 96px}
   align-items:center;justify-content:center;touch-action:none;overscroll-behavior:none;
 }
 .viewer.on{display:flex}
-.viewer img{max-width:100%;max-height:100%;object-fit:contain;pointer-events:none}
+.vwrap{position:relative;max-width:100%;max-height:100%;display:flex}
+.vwrap img{max-width:100%;max-height:100%;object-fit:contain;pointer-events:none;display:block}
+#vcanvas{position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none}
+.viewer.draw #vcanvas{pointer-events:auto}
+.vtools{
+  position:fixed;bottom:calc(env(safe-area-inset-bottom) + 14px);left:50%;
+  transform:translateX(-50%);z-index:82;display:none;gap:8px;
+}
+.viewer.on ~ .vtools{display:flex}
+.vtools button{
+  background:rgba(40,40,40,.9);color:#fff;border:1px solid #555;
+  padding:11px 14px;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;
+}
+.vtools button.on{background:#ff3d68;border-color:#ff3d68;color:#fff}
 .vpage{
-  position:fixed;bottom:calc(env(safe-area-inset-bottom) + 16px);left:50%;
+  position:fixed;top:calc(env(safe-area-inset-top) + 18px);left:50%;
   transform:translateX(-50%);z-index:81;
-  background:rgba(40,40,40,.85);color:#fff;padding:7px 16px;border-radius:20px;
+  background:rgba(40,40,40,.85);color:#fff;padding:6px 15px;border-radius:20px;
   font-size:13px;font-weight:700;font-variant-numeric:tabular-nums;display:none;
 }
 .vnav{
@@ -239,11 +252,22 @@ pre{
   border-radius:10px;font-size:12px;word-break:break-all"></div>
 
 <div class="scrim" id="scrim"></div>
-<div class="viewer" id="viewer"><img id="vimg" alt="お品書き"></div>
+<div class="viewer" id="viewer">
+  <div class="vwrap" id="vwrap">
+    <img id="vimg" alt="お品書き">
+    <canvas id="vcanvas"></canvas>
+  </div>
+</div>
 <button class="vclose" id="vclose" style="display:none">✕</button>
 <button class="vnav l" id="vprev">‹</button>
 <button class="vnav r" id="vnext">›</button>
 <div class="vpage" id="vpage"></div>
+<div class="vtools" id="vtools">
+  <button id="tPen">✏️ 書き込む</button>
+  <button id="tUndo" style="display:none">↩ 1つ戻す</button>
+  <button id="tClear" style="display:none">全消し</button>
+  <button id="tDone" style="display:none">完了</button>
+</div>
 <div class="sheet" id="sheet"></div>
 
 <script>
@@ -266,6 +290,7 @@ function load(){
       r.consign = r.consign || {};   // {id: '名前'}（空文字なら名前未入力）
       r.names = r.names || [];       // 入力済みの委託者名の候補
       r.order = r.order || {};       // ▲▼で動かした巡回順
+      r.pics  = r.pics  || {};       // 端末で追加した画像 {id:[key,...]}
       return r;
     }
   }catch(e){}
@@ -277,10 +302,10 @@ function load(){
       const map = {0:0, 1:1, 2:3, 3:4};
       const st = {};
       for(const k in o.status) st[k] = map[o.status[k]] !== undefined ? map[o.status[k]] : 0;
-      return {status:st, memo:o.memo||{}, added:o.added||[], consign:{}, names:[], order:{}};
+      return {status:st, memo:o.memo||{}, added:o.added||[], consign:{}, names:[], order:{}, pics:{}};
     }
   }catch(e){}
-  return {status:{}, memo:{}, added:[], consign:{}, names:[], order:{}};
+  return {status:{}, memo:{}, added:[], consign:{}, names:[], order:{}, pics:{}};
 }
 function save(){
   try{ localStorage.setItem(KEY, JSON.stringify(db)); }
@@ -428,6 +453,80 @@ function urgency(row, live){
   return { u:0, label:'' };
 }
 
+/* ---------- IndexedDB（追加画像と手書きレイヤー） ----------
+   localStorage は状況データ専用に保つ。画像や線はこちらへ。 */
+const IDB_NAME = 'c108store', IDB_VER = 1;
+let idb = null;
+function idbOpen(){
+  return new Promise((res, rej) => {
+    if(idb) return res(idb);
+    const rq = indexedDB.open(IDB_NAME, IDB_VER);
+    rq.onupgradeneeded = () => {
+      const d = rq.result;
+      if(!d.objectStoreNames.contains('pics')) d.createObjectStore('pics');   // 追加画像 key: pic-<n>
+      if(!d.objectStoreNames.contains('draw')) d.createObjectStore('draw');   // 手書き   key: 画像名
+    };
+    rq.onsuccess = () => { idb = rq.result; res(idb); };
+    rq.onerror = () => rej(rq.error);
+  });
+}
+function idbGet(store, key){
+  return idbOpen().then(d => new Promise((res, rej) => {
+    const rq = d.transaction(store, 'readonly').objectStore(store).get(key);
+    rq.onsuccess = () => res(rq.result);
+    rq.onerror = () => rej(rq.error);
+  }));
+}
+function idbSet(store, key, val){
+  return idbOpen().then(d => new Promise((res, rej) => {
+    const tx = d.transaction(store, 'readwrite');
+    tx.objectStore(store).put(val, key);
+    tx.oncomplete = () => res(true);
+    tx.onerror = () => rej(tx.error);
+  }));
+}
+function idbDel(store, key){
+  return idbOpen().then(d => new Promise((res, rej) => {
+    const tx = d.transaction(store, 'readwrite');
+    tx.objectStore(store).delete(key);
+    tx.oncomplete = () => res(true);
+    tx.onerror = () => rej(tx.error);
+  }));
+}
+// 追加画像は blob URL にして表示する。表示用のキャッシュ。
+const picURL = {};
+function loadPicURL(key){
+  if(picURL[key]) return Promise.resolve(picURL[key]);
+  return idbGet('pics', key).then(blob => {
+    if(!blob) return null;
+    picURL[key] = URL.createObjectURL(blob);
+    return picURL[key];
+  }).catch(() => null);
+}
+
+// 追加画像は長辺1400pxに縮めて保存（容量を抑える）
+function shrinkImage(file, max){
+  max = max || 1400;
+  return new Promise((res, rej) => {
+    const url = URL.createObjectURL(file);
+    const im = new Image();
+    im.onload = () => {
+      let { width:w, height:h } = im;
+      if(Math.max(w,h) > max){ const r = max / Math.max(w,h); w = Math.round(w*r); h = Math.round(h*r); }
+      const c = document.createElement('canvas');
+      c.width = w; c.height = h;
+      c.getContext('2d').drawImage(im, 0, 0, w, h);
+      URL.revokeObjectURL(url);
+      c.toBlob(b => b ? res(b) : rej(new Error('blob')), 'image/jpeg', 0.72);
+    };
+    im.onerror = () => { URL.revokeObjectURL(url); rej(new Error('load')); };
+    im.src = url;
+  });
+}
+// 同梱画像 ＋ 端末で追加した画像
+function imgsOf(r){
+  return (r.img || []).concat((db.pics && db.pics[r.id]) || []);
+}
 function esc(s){ return (s||'').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 
 function render(){
@@ -467,8 +566,9 @@ function render(){
     sub.push(`<span>${esc(r.pr)}</span>`);
     if(r.url) sub.push('<span>X</span>');
     if(db.memo[r.id]) sub.push('<span>メモ</span>');
-    const img = (r.img && r.img.length)
-      ? `<img class="thumb" src="${encodeURIComponent(r.img[0])}" alt="" loading="lazy">` : '';
+    const ilist = imgsOf(r);
+    const img = ilist.length
+      ? `<img class="thumb" data-img="${esc(ilist[0])}" alt="" loading="lazy">` : '';
     const con = Object.prototype.hasOwnProperty.call(db.consign, r.id)
       ? `<span class="cbadge">委託${db.consign[r.id] ? '・' + esc(db.consign[r.id]) : ''}</span>` : '';
     html += `<div class="row p${Math.min(PR[r.pr],3)} s${s}${ug.u?' u'+ug.u:''}" data-id="${esc(r.id)}">
@@ -485,6 +585,9 @@ function render(){
     </div>`;
   }
   main.innerHTML = html;
+  main.querySelectorAll('.thumb[data-img]').forEach(im => {
+    srcFor(im.dataset.img).then(u => { if(u) im.src = u; });
+  });
   main.querySelectorAll('.row').forEach(el => {
     if(ordMode){
       // 並び替え中はスワイプを無効化（誤操作防止）
@@ -577,9 +680,11 @@ function openSheet(id){
     <div class="grid" style="margin-top:6px" id="priGrid">
       ${PRIS.map(p=>`<button class="btn b3 ${p===cur.pr?'sel':''}" data-pri="${p}">${p}</button>`).join('')}
     </div>` : ''}
-    ${(cur.img && cur.img.length) ? `<div class="oshi">${cur.img.map(f=>
-      `<img src="${encodeURIComponent(f)}" alt="お品書き" data-full="${encodeURIComponent(f)}" loading="lazy">`
+    ${imgsOf(cur).length ? `<div class="oshi">${imgsOf(cur).map((f,i)=>
+      `<img data-i="${i}" alt="お品書き" loading="lazy">`
     ).join('')}</div>` : ''}
+    <button class="btn wide b3" id="addPic" style="margin-top:10px">＋ お品書きを写真から追加</button>
+    <input type="file" id="picFile" accept="image/*" style="display:none">
     <label class="f" style="margin-top:14px">状況</label>
     <div class="grid" style="margin-top:6px">
       ${ST.map((t,i)=>`<button class="btn ${cls[i]} ${i===s?'sel':''}" data-s="${i}">${t}</button>`).join('')}
@@ -648,8 +753,29 @@ function openSheet(id){
       save(); openSheet(id);
     });
   }
-  document.getElementById('sheet').querySelectorAll('.oshi img').forEach((im, i) =>
-    im.addEventListener('click', () => openViewer(cur.img, i)));
+  // お品書きサムネイル（追加画像は非同期で解決）
+  const list = imgsOf(cur);
+  document.getElementById('sheet').querySelectorAll('.oshi img').forEach(im => {
+    const i = +im.dataset.i;
+    srcFor(list[i]).then(u => { if(u) im.src = u; });
+    im.addEventListener('click', () => openViewer(list, i));
+  });
+  // 写真から追加
+  const fi = document.getElementById('picFile');
+  document.getElementById('addPic').addEventListener('click', () => fi.click());
+  fi.addEventListener('change', () => {
+    const f = fi.files && fi.files[0];
+    if(!f) return;
+    shrinkImage(f).then(blob => {
+      const key = 'pic-' + Date.now();
+      return idbSet('pics', key, blob).then(() => {
+        db.pics = db.pics || {};
+        (db.pics[cur.id] = db.pics[cur.id] || []).push(key);
+        save(); openSheet(id);
+      });
+    }).catch(() => alert('画像を保存できませんでした'));
+    fi.value = '';
+  });
   document.getElementById('close').addEventListener('click', closeSheet);
   const sheetEl = document.getElementById('sheet');
   const wasOpen = sheetEl.classList.contains('on');
@@ -657,7 +783,14 @@ function openSheet(id){
   document.getElementById('scrim').classList.add('on');
   if(!wasOpen) lockBody();
 }
-let vList = [], vIdx = 0;
+let vList = [], vIdx = 0, drawMode = false, strokes = [], curStroke = null;
+
+function srcFor(name){
+  // 'pic-N' は端末に追加した画像、それ以外は同梱のファイル
+  return name.indexOf('pic-') === 0
+    ? loadPicURL(name)
+    : Promise.resolve(encodeURIComponent(name));
+}
 function openViewer(list, idx){
   vList = list; vIdx = idx;
   lockBody();
@@ -666,20 +799,26 @@ function openViewer(list, idx){
   showViewer();
 }
 function showViewer(){
-  document.getElementById('vimg').src = encodeURIComponent(vList[vIdx]);
+  setDraw(false);
+  const name = vList[vIdx];
+  const img = document.getElementById('vimg');
+  srcFor(name).then(u => { if(u) img.src = u; });
   const multi = vList.length > 1;
   const pg = document.getElementById('vpage');
   pg.style.display = multi ? 'block' : 'none';
   pg.textContent = (vIdx + 1) + ' / ' + vList.length;
   document.getElementById('vprev').style.display = multi ? 'block' : 'none';
   document.getElementById('vnext').style.display = multi ? 'block' : 'none';
+  // 保存済みの手書きを読み込む
+  idbGet('draw', name).then(s => { strokes = s || []; redraw(); }).catch(() => { strokes = []; redraw(); });
 }
 function vStep(d){
-  if(vList.length < 2) return;
+  if(vList.length < 2 || drawMode) return;
   vIdx = (vIdx + d + vList.length) % vList.length;
   showViewer();
 }
 function closeViewer(){
+  setDraw(false);
   document.getElementById('viewer').classList.remove('on');
   document.getElementById('vclose').style.display = 'none';
   document.getElementById('vpage').style.display = 'none';
@@ -687,7 +826,94 @@ function closeViewer(){
   document.getElementById('vnext').style.display = 'none';
   document.getElementById('vimg').src = '';
   unlockBody();
+  render();
 }
+
+/* ---------- 手書き ---------- */
+function canvasFit(){
+  const c = document.getElementById('vcanvas'), img = document.getElementById('vimg');
+  const r = img.getBoundingClientRect();
+  if(!r.width || !r.height) return null;
+  const dpr = window.devicePixelRatio || 1;
+  c.width = Math.round(r.width * dpr);
+  c.height = Math.round(r.height * dpr);
+  const ctx = c.getContext('2d');
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  return { ctx, w: r.width, h: r.height };
+}
+function redraw(){
+  const f = canvasFit();
+  if(!f) { setTimeout(redraw, 60); return; }   // 画像がまだ描画されていない
+  const { ctx, w, h } = f;
+  ctx.clearRect(0, 0, w, h);
+  ctx.strokeStyle = '#ff2d20';
+  ctx.lineWidth = 4;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  for(const st of strokes){
+    if(st.length < 2) continue;
+    ctx.beginPath();
+    ctx.moveTo(st[0][0] * w, st[0][1] * h);
+    for(let i = 1; i < st.length; i++) ctx.lineTo(st[i][0] * w, st[i][1] * h);
+    ctx.stroke();
+  }
+}
+function setDraw(on){
+  drawMode = on;
+  const v = document.getElementById('viewer');
+  v.classList.toggle('draw', on);
+  document.getElementById('tPen').classList.toggle('on', on);
+  document.getElementById('tPen').style.display = on ? 'none' : '';
+  ['tUndo','tClear','tDone'].forEach(id =>
+    document.getElementById(id).style.display = on ? '' : 'none');
+  document.getElementById('vclose').style.display = on ? 'none' : 'block';
+  if(on) redraw();
+}
+function saveStrokes(){
+  const name = vList[vIdx];
+  if(strokes.length) idbSet('draw', name, strokes).catch(() => {});
+  else idbDel('draw', name).catch(() => {});
+}
+(function(){
+  const c = document.getElementById('vcanvas');
+  const pos = e => {
+    const r = c.getBoundingClientRect();
+    const t = e.touches ? e.touches[0] : e;
+    return [(t.clientX - r.left) / r.width, (t.clientY - r.top) / r.height];
+  };
+  const start = e => {
+    if(!drawMode) return;
+    if(e.cancelable) e.preventDefault();
+    curStroke = [pos(e)]; strokes.push(curStroke);
+  };
+  const move = e => {
+    if(!drawMode || !curStroke) return;
+    if(e.cancelable) e.preventDefault();
+    curStroke.push(pos(e)); redraw();
+  };
+  const end = () => {
+    if(!drawMode || !curStroke) return;
+    curStroke = null; saveStrokes();
+  };
+  c.addEventListener('touchstart', start, {passive:false});
+  c.addEventListener('touchmove', move, {passive:false});
+  c.addEventListener('touchend', end);
+  c.addEventListener('mousedown', start);
+  c.addEventListener('mousemove', e => { if(e.buttons) move(e); });
+  c.addEventListener('mouseup', end);
+})();
+document.getElementById('tPen').addEventListener('click', () => setDraw(true));
+document.getElementById('tDone').addEventListener('click', () => setDraw(false));
+document.getElementById('tUndo').addEventListener('click', () => {
+  strokes.pop(); redraw(); saveStrokes();
+});
+document.getElementById('tClear').addEventListener('click', () => {
+  if(!strokes.length || confirm('この画像の書き込みを全部消しますか')){
+    strokes = []; redraw(); saveStrokes();
+  }
+});
+window.addEventListener('resize', () => { if(document.getElementById('viewer').classList.contains('on')) redraw(); });
+
 document.getElementById('vclose').addEventListener('click', closeViewer);
 document.getElementById('vprev').addEventListener('click', e => { e.stopPropagation(); vStep(-1); });
 document.getElementById('vnext').addEventListener('click', e => { e.stopPropagation(); vStep(1); });
@@ -697,17 +923,17 @@ document.getElementById('vnext').addEventListener('click', e => { e.stopPropagat
   const v = document.getElementById('viewer');
   let x0 = null, y0 = null, moved = false;
   v.addEventListener('touchstart', e => {
-    if(e.touches.length !== 1) { x0 = null; return; }
+    if(drawMode || e.touches.length !== 1) { x0 = null; return; }
     x0 = e.touches[0].clientX; y0 = e.touches[0].clientY; moved = false;
   }, {passive:true});
   v.addEventListener('touchmove', e => {
-    // 裏のページが動かないよう、ビューア上の縦移動も止める
+    if(drawMode) return;
     if(e.cancelable) e.preventDefault();
     if(x0 === null || e.touches.length !== 1) return;
     if(Math.abs(e.touches[0].clientX - x0) > 12) moved = true;
   }, {passive:false});
   v.addEventListener('touchend', e => {
-    if(x0 === null) return;
+    if(drawMode || x0 === null) return;
     const t = e.changedTouches[0];
     const dx = t.clientX - x0, dy = t.clientY - y0;
     if(Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy)){
@@ -717,10 +943,10 @@ document.getElementById('vnext').addEventListener('click', e => { e.stopPropagat
     }
     x0 = null;
   });
-  // マウス（PC確認用）
   v.addEventListener('click', e => {
+    if(drawMode) return;
     if(e.target.classList.contains('vnav')) return;
-    closeViewer();
+    if(e.target.id === 'vcanvas' || e.target.id === 'vimg' || e.target.id === 'viewer' || e.target.id === 'vwrap') closeViewer();
   });
 })();
 function closeSheet(){
@@ -856,6 +1082,23 @@ function exportText(){
         return `  ${r.d}\t${r.p}\t${r.n}\t${ST[db.status[id]||0]}`;
       }).join('\n') + '\n';
     }
+  }else{
+    t += '（なし）';
+  }
+
+  // 4. 端末で追加したお品書き（Notionへ入れ直す用の控え）
+  const picIds = Object.keys(db.pics || {});
+  const drawn = [];
+  let picCount = 0;
+  for(const id of picIds) picCount += db.pics[id].length;
+  t += `\n\n===== 4. 端末で追加したお品書き（${picCount}枚）=====\n`;
+  if(picCount){
+    t += picIds.map(id => {
+      const r = rowOf(id);
+      const nm = r ? `${r.d}\t${r.p}\t${r.n}` : id;
+      return `${nm}\t${db.pics[id].length}枚`;
+    }).join('\n');
+    t += `\n※画像そのものはこの端末の中にあります。書き出しには含まれません。`;
   }else{
     t += '（なし）';
   }
