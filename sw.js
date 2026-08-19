@@ -1,6 +1,6 @@
 // C108 巡回リスト オフライン用 Service Worker
 // 画像はリポジトリ直下に配置されている前提
-const CACHE = 'c108-v6';
+const CACHE = 'c108-v7';
 const CORE = [
   './',
   './index.html',
