@@ -18,7 +18,7 @@
   --ok:#25c463; --gone:#7a4a55; --skipc:#3d4652;
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-html,body{margin:0;padding:0}
+html,body{margin:0;padding:0;overflow-x:hidden;overscroll-behavior-x:none}
 body{
   background:var(--bg);color:var(--ink);
   font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Noto Sans JP",sans-serif;
@@ -66,7 +66,7 @@ main{padding:10px 10px 96px}
 .hall b{font-size:17px;letter-spacing:.04em}
 .hall span{font-size:12px;color:var(--dim);font-variant-numeric:tabular-nums}
 .row{
-  display:flex;align-items:center;gap:10px;
+  display:flex;align-items:center;gap:10px;touch-action:pan-y;
   padding:10px 10px;margin-bottom:6px;border-radius:10px;
   background:var(--panel);border:1px solid var(--line);
   border-left:5px solid var(--etc);cursor:pointer;
@@ -124,7 +124,7 @@ main{padding:10px 10px 96px}
 }
 .viewer{
   position:fixed;inset:0;z-index:80;background:#000;display:none;
-  align-items:center;justify-content:center;touch-action:pan-y;
+  align-items:center;justify-content:center;touch-action:none;overscroll-behavior:none;
 }
 .viewer.on{display:flex}
 .viewer img{max-width:100%;max-height:100%;object-fit:contain;pointer-events:none}
@@ -156,6 +156,7 @@ body.noscroll{overflow:hidden;position:fixed;width:100%}
   transition:transform .18s ease-out;
   background:var(--panel);border-top:1px solid var(--line);
   border-radius:16px 16px 0 0;padding:14px 14px calc(env(safe-area-inset-bottom) + 16px);
+  max-height:86vh;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;
 }
 .sheet.on{transform:none}
 @media (prefers-reduced-motion:reduce){.sheet{transition:none}}
@@ -574,15 +575,16 @@ function openSheet(id){
   document.getElementById('sheet').querySelectorAll('.oshi img').forEach((im, i) =>
     im.addEventListener('click', () => openViewer(cur.img, i)));
   document.getElementById('close').addEventListener('click', closeSheet);
-  document.getElementById('sheet').classList.add('on');
+  const sheetEl = document.getElementById('sheet');
+  const wasOpen = sheetEl.classList.contains('on');
+  sheetEl.classList.add('on');
   document.getElementById('scrim').classList.add('on');
+  if(!wasOpen) lockBody();
 }
-let vList = [], vIdx = 0, vScrollY = 0;
+let vList = [], vIdx = 0;
 function openViewer(list, idx){
   vList = list; vIdx = idx;
-  vScrollY = window.scrollY;
-  document.body.classList.add('noscroll');
-  document.body.style.top = (-vScrollY) + 'px';
+  lockBody();
   document.getElementById('viewer').classList.add('on');
   document.getElementById('vclose').style.display = 'block';
   showViewer();
@@ -608,9 +610,7 @@ function closeViewer(){
   document.getElementById('vprev').style.display = 'none';
   document.getElementById('vnext').style.display = 'none';
   document.getElementById('vimg').src = '';
-  document.body.classList.remove('noscroll');
-  document.body.style.top = '';
-  window.scrollTo(0, vScrollY);
+  unlockBody();
 }
 document.getElementById('vclose').addEventListener('click', closeViewer);
 document.getElementById('vprev').addEventListener('click', e => { e.stopPropagation(); vStep(-1); });
@@ -625,9 +625,11 @@ document.getElementById('vnext').addEventListener('click', e => { e.stopPropagat
     x0 = e.touches[0].clientX; y0 = e.touches[0].clientY; moved = false;
   }, {passive:true});
   v.addEventListener('touchmove', e => {
+    // 裏のページが動かないよう、ビューア上の縦移動も止める
+    if(e.cancelable) e.preventDefault();
     if(x0 === null || e.touches.length !== 1) return;
     if(Math.abs(e.touches[0].clientX - x0) > 12) moved = true;
-  }, {passive:true});
+  }, {passive:false});
   v.addEventListener('touchend', e => {
     if(x0 === null) return;
     const t = e.changedTouches[0];
@@ -648,7 +650,24 @@ document.getElementById('vnext').addEventListener('click', e => { e.stopPropagat
 function closeSheet(){
   document.getElementById('sheet').classList.remove('on');
   document.getElementById('scrim').classList.remove('on');
+  unlockBody();
   render();
+}
+
+/* 背面のスクロールを止める。シートと画像ビューアで共用 */
+let lockY = 0, lockDepth = 0;
+function lockBody(){
+  if(lockDepth++ > 0) return;      // 二重ロックを防ぐ
+  lockY = window.scrollY;
+  document.body.classList.add('noscroll');
+  document.body.style.top = (-lockY) + 'px';
+}
+function unlockBody(){
+  if(--lockDepth > 0) return;
+  if(lockDepth < 0) lockDepth = 0;
+  document.body.classList.remove('noscroll');
+  document.body.style.top = '';
+  window.scrollTo(0, lockY);
 }
 document.getElementById('scrim').addEventListener('click', closeSheet);
 
