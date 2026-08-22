@@ -107,9 +107,14 @@ main{padding:10px 10px 96px}
 }
 .mv button:disabled{opacity:.3}
 .onum{
-  min-width:26px;text-align:center;font-size:12px;font-weight:800;color:var(--mute);
+  min-width:22px;text-align:center;font-size:12px;font-weight:800;color:var(--mute);
   font-variant-numeric:tabular-nums;flex-shrink:0;
 }
+/* 巡回順モードは 番号+配置+名前+状況+▲▼ が並ぶので幅を詰める */
+.row.ord{gap:7px;padding:10px 8px}
+.row.ord .chip{min-width:62px;font-size:14.5px;padding:6px 3px}
+.st.ordst{min-width:42px;font-size:9.5px;padding:5px 2px}
+.row.ord .mv button{width:32px;height:25px}
 
 /* ---- 相対軸（右ボーダー）：残り時間で色が変わる ---- */
 .row{border-right:5px solid transparent}
@@ -607,7 +612,7 @@ function render(){
       ? `<img class="thumb" data-img="${esc(ilist[0])}" alt="" loading="lazy">` : '';
     const con = Object.prototype.hasOwnProperty.call(db.consign, r.id)
       ? `<span class="cbadge">委託${db.consign[r.id] ? '・' + esc(db.consign[r.id]) : ''}</span>` : '';
-    html += `<div class="row p${Math.min(PR[r.pr],3)} s${s}${ug.u?' u'+ug.u:''}" data-id="${esc(r.id)}">
+    html += `<div class="row p${Math.min(PR[r.pr],3)} s${s}${ug.u?' u'+ug.u:''}${ordMode?' ord':''}" data-id="${esc(r.id)}">
       ${ordMode ? `<div class="onum">${orderOf(r, base)}</div>` : ''}
       <div class="chip">${esc(r.p)}</div>
       <div class="body">
@@ -616,7 +621,8 @@ function render(){
       </div>
       ${ordMode ? '' : img}
       ${ordMode
-        ? `<div class="mv"><button data-mv="up">▲</button><button data-mv="down">▼</button></div>`
+        ? `<div class="st ordst">${STS[s]}</div>
+           <div class="mv"><button data-mv="up">▲</button><button data-mv="down">▼</button></div>`
         : `<div class="st">${STS[s]}</div>`}
     </div>`;
   }
