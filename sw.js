@@ -1,9 +1,10 @@
 // C108 巡回リスト オフライン用 Service Worker
 // 画像はリポジトリ直下に配置されている前提
-const CACHE = 'c108-v14';
+const CACHE = 'c108-v15';
 const CORE = [
   './',
   './index.html',
+  './zosho.html',
   './manifest.webmanifest',
   './icon-180.png',
   './icon-512.png'

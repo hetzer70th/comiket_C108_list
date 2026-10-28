@@ -183,6 +183,25 @@ mark{background:rgba(240,49,110,.22);color:inherit;padding:0 1px;border-radius:1
 @media (prefers-reduced-motion:no-preference){
   html{scroll-behavior:smooth}
 }
+
+/* ---------- サークルのX・巡回リストからの絞り込み ---------- */
+.gx{
+  font-family:var(--gothic);font-size:11px;font-weight:800;letter-spacing:.02em;
+  color:var(--blue);text-decoration:none;
+  border:1px solid var(--blue);border-radius:2px;padding:1px 6px;flex:none;
+}
+.focus{
+  display:flex;align-items:center;gap:8px;flex-wrap:wrap;
+  margin:0 0 9px;padding:7px 9px;font-size:12.5px;
+  background:var(--card);border-left:3px solid var(--pink);
+}
+.focus b{font-family:var(--mincho);font-size:14px}
+.focus button{
+  font-family:var(--gothic);font-size:11.5px;font-weight:700;
+  padding:4px 9px;border-radius:2px;cursor:pointer;
+  background:transparent;color:var(--blue);border:1px solid var(--blue);
+}
+.focus .back{background:var(--blue);color:var(--paper)}
 </style>
 </head>
 <body>
@@ -192,6 +211,7 @@ mark{background:rgba(240,49,110,.22);color:inherit;padding:0 1px;border-radius:1
     <h1>蔵書目録</h1>
     <div class="tally" id="tally"></div>
   </div>
+  <div class="focus" id="focus" hidden></div>
   <input id="q" type="search" placeholder="タイトル・サークル・作者で探す" autocomplete="off" autocorrect="off">
   <div class="filters" id="filters"></div>
   <div class="bar" id="bar"></div>
@@ -215,6 +235,10 @@ const ORDER  = ['#','A','B','C','D','E','F','G','H','I','J','K','L','M','N','O',
 let query = '', picked = new Set(), safeOnly = false;
 let axis = 'c';          // 'c' = サークル名で束ねる / 'a' = 作者名で束ねる
 let statsOpen = false;
+// 巡回リストから zosho.html?c=サークル名&from=list で開かれたときの絞り込み
+const params = new URLSearchParams(location.search);
+let only = params.get('c');
+const fromList = params.get('from') === 'list';
 
 /* ---------- ツメの割り当て ---------- */
 const KANA = {
@@ -253,6 +277,7 @@ function norm(s){
     .replace(/[\uff01-\uff5e]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xfee0));
 }
 function hit(r){
+  if(only !== null && r.c !== only) return false;
   if(safeOnly && r.k.indexOf('成人向け') !== -1) return false;
   for(const p of picked){
     if(r.k.indexOf(p) === -1 && r.g.indexOf(p) === -1) return false;
@@ -332,6 +357,7 @@ function render(){
     `<b>${rows.length}</b>冊 / ${new Set(rows.map(keyOf).filter(Boolean)).size}${unit}`;
 
   renderStats(rows);
+  paintFocus();
 
   const list = document.getElementById('list');
   if(!rows.length){
@@ -362,6 +388,7 @@ function render(){
     html += `<section class="group">
       <div class="ghead">
         <div class="gname${g.name ? '' : ' unset'}">${g.name ? hl(g.name) : blank}</div>
+        ${xLink(g)}
         <div class="gcount">${g.items.length}</div>
       </div>`;
     for(const r of g.items.sort((x, y) => x.t.localeCompare(y.t, 'ja'))){
@@ -383,6 +410,30 @@ function render(){
   list.innerHTML = html;
   paintRail(live);
 }
+
+/* ---------- サークルのX ---------- */
+function xLink(g){
+  if(axis !== 'c') return '';
+  const it = g.items.find(r => r.x);
+  if(!it) return '';
+  return `<a class="gx" href="https://x.com/${encodeURIComponent(it.x)}" target="_blank" rel="noopener" aria-label="${esc(g.name)}のX">X</a>`;
+}
+
+/* ---------- 巡回リストからの絞り込み表示 ---------- */
+function paintFocus(){
+  const f = document.getElementById('focus');
+  if(only === null && !fromList){ f.hidden = true; return; }
+  f.hidden = false;
+  f.innerHTML =
+    (only !== null ? `<span><b>${esc(only)}</b> の蔵書だけ表示中</span><button data-f="all">すべて表示</button>` : '') +
+    (fromList ? `<button class="back" data-f="back">← 巡回リストへ戻る</button>` : '');
+}
+document.getElementById('focus').addEventListener('click', e => {
+  const b = e.target.closest('button');
+  if(!b) return;
+  if(b.dataset.f === 'all'){ only = null; render(); window.scrollTo({ top: 0 }); }
+  if(b.dataset.f === 'back'){ if(history.length > 1) history.back(); else location.href = 'index.html'; }
+});
 
 /* ---------- ツメ ---------- */
 function paintRail(live){

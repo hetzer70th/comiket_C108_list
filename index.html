@@ -210,6 +210,7 @@ body.noscroll{overflow:hidden;position:fixed;width:100%}
   background:var(--panel2);border:1px solid var(--line);
   color:var(--ink);text-decoration:none;font-weight:700;font-size:14px;
 }
+.sub .zc{color:#4f8dff;font-weight:700}
 .lnk.off{color:var(--dim);pointer-events:none}
 textarea,input[type=text]{
   width:100%;margin-top:8px;padding:11px;border-radius:9px;font-size:16px;
@@ -606,6 +607,7 @@ function render(){
     if(ug.label) sub.push(`<span class="rem u${ug.u}">${esc(ug.label)}</span>`);
     sub.push(`<span>${esc(r.pr)}</span>`);
     if(r.url) sub.push('<span>X</span>');
+    if(r.zc) sub.push(`<span class="zc">蔵書${r.zc}</span>`);
     if(db.memo[r.id]) sub.push('<span>メモ</span>');
     const ilist = imgsOf(r);
     const img = ilist.length
@@ -740,6 +742,9 @@ function openSheet(id){
     </div>
     <div class="hint">${conName ? '委託者：' + esc(conName) : '委託者は未入力（後で入れられます）'}</div>
     ` : ''}
+    ${cur.zc
+      ? `<a class="lnk" href="zosho.html?c=${encodeURIComponent(cur.zq)}&from=list">持っている本を見る（${cur.zc}冊）</a>`
+      : ''}
     ${cur.url
       ? `<a class="lnk" href="${esc(cur.url)}" target="_blank" rel="noopener">Xで開く（要通信）</a>`
       : ''}
